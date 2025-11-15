@@ -37,9 +37,60 @@ The projects below are organized by how they relate to our project.
 
 ---
 
-## CATEGORY 2: CAN Bus Reference & Documentation
+## CATEGORY 2: Electric Vehicle (EV) Conversion
 
-### 2.1 RX8 Reverse Engineering
+### 2.1 RX8-dash-CAN-controller (EV Conversion)
+
+**Repository**: https://github.com/EV8-Steve/RX8-dash-CAN-controller
+
+**Status**: 📚 Reference for EV conversion use case
+
+**Purpose**: RX8 dashboard integration for electric vehicle conversions
+
+**Key Features**:
+- Arduino Nano based CAN controller
+- Integrates with Open Inverter (popular EV motor controller)
+- ABS system integration
+- Power Assisted Steering (PAS) support
+- 8kHz PWM for motor control
+- Odometer pulse generation
+- Wheel speed monitoring
+- Dashboard warning light control
+
+**Technical Details**:
+- **Version**: 1.4 (8kHz PWM, microsecond-adjusted)
+- **Hardware**: Arduino Nano
+- **CAN Speed**: 500 kbps
+- **Messages**: Same as factory (0x201, 0x420, etc.)
+- **Special**: Converts EV motor data to ICE-equivalent signals
+
+**How It Relates**:
+- **Very similar** to MazdaRX8Arduino project
+- Same CAN messages, different data source
+- Replaces engine with electric motor
+- Maps inverter temperature → coolant temperature
+- Maps motor RPM → engine RPM
+- Adds odometer pulse output
+
+**Relevance**: ⭐⭐⭐⭐⭐ HIGH - Nearly identical use case
+
+**Integration Potential**:
+- Could merge EV-specific features
+- Add optional "EV mode" to our project
+- Extract odometer pulse code
+- Reference for Open Inverter integration
+
+**Use Case**: Engine swap where "engine" is an electric motor
+
+**Languages**: C++ (100%)
+**Created**: April 2023
+**Activity**: 1 commit (working implementation)
+
+---
+
+## CATEGORY 3: CAN Bus Reference & Documentation
+
+### 3.1 RX8 Reverse Engineering
 
 **Repository**: https://github.com/rnd-ash/rx8-reverse-engineering
 
@@ -61,7 +112,7 @@ The projects below are organized by how they relate to our project.
 
 ---
 
-### 2.2 RX8 CAN Bus PIDs for Racing
+### 3.2 RX8 CAN Bus PIDs for Racing
 
 **Repository**: https://github.com/topolittle/RX8-CAN-BUS
 
@@ -85,7 +136,7 @@ The projects below are organized by how they relate to our project.
 
 ---
 
-### 2.3 RX8-Dash CAN Protocol
+### 3.3 RX8-Dash CAN Protocol
 
 **Repository**: https://github.com/Antipixel/RX8-Dash
 
@@ -109,9 +160,9 @@ The projects below are organized by how they relate to our project.
 
 ---
 
-## CATEGORY 3: Alternative Displays & Monitoring
+## CATEGORY 4: Alternative Displays & Monitoring
 
-### 3.1 Arduino OBD2 Display
+### 4.1 Arduino OBD2 Display
 
 **Repository**: https://github.com/Radivv/arduino-display-obd2-can-mazda-rx8
 
@@ -132,7 +183,7 @@ The projects below are organized by how they relate to our project.
 
 ---
 
-### 3.2 RX8 Coolant Monitor
+### 4.2 RX8 Coolant Monitor
 
 **Repository**: https://github.com/topolittle/rx8-coolant-monitor
 
@@ -154,9 +205,9 @@ The projects below are organized by how they relate to our project.
 
 ---
 
-## CATEGORY 4: ECU Tuning Tools
+## CATEGORY 5: ECU Tuning Tools
 
-### 4.1 RX8 ECU Dump Tool
+### 5.1 RX8 ECU Dump Tool
 
 **Repository**: https://github.com/ConnorRigby/rx8-ecu-dump
 
@@ -180,7 +231,7 @@ The projects below are organized by how they relate to our project.
 
 ---
 
-### 4.2 RX8Defs - ECU Definitions
+### 5.2 RX8Defs - ECU Definitions
 
 **Repository**: https://github.com/Rx8Man/RX8Defs
 
@@ -200,7 +251,7 @@ The projects below are organized by how they relate to our project.
 
 ---
 
-### 4.3 Rx8Man Reflash Tool
+### 5.3 Rx8Man Reflash Tool
 
 **Repository**: https://github.com/Rx8Man/Rx8Man
 
@@ -220,7 +271,7 @@ The projects below are organized by how they relate to our project.
 
 ---
 
-### 4.4 Mazda RX8 PCM Reverse Engineering
+### 5.4 Mazda RX8 PCM Reverse Engineering
 
 **Repository**: https://github.com/equinox311/Mazda_RX8_PCM_ReverseEngineering
 
@@ -240,7 +291,7 @@ The projects below are organized by how they relate to our project.
 
 ---
 
-### 4.5 GROM RomRaider
+### 5.5 GROM RomRaider
 
 **Repository**: https://github.com/equinox311/GROM_RomRaider
 
@@ -261,9 +312,9 @@ The projects below are organized by how they relate to our project.
 
 ---
 
-## CATEGORY 5: Specialized Components
+## CATEGORY 6: Specialized Components
 
-### 5.1 RX8 Wipers Speed-Sensitive
+### 6.1 RX8 Wipers Speed-Sensitive
 
 **Repository**: https://github.com/basilhussain/rx8-wipers
 
@@ -283,9 +334,9 @@ The projects below are organized by how they relate to our project.
 
 ---
 
-## CATEGORY 6: Entertainment & Testing
+## CATEGORY 7: Entertainment & Testing
 
-### 6.1 RX8-Arduino Sim Racing
+### 7.1 RX8-Arduino Sim Racing
 
 **Repository**: https://github.com/Izekeal/rx8-arduino
 
@@ -313,7 +364,8 @@ The projects below are organized by how they relate to our project.
 
 | Project | Use Case | Hardware | Replaces ECU? | Stars |
 |---------|----------|----------|---------------|-------|
-| **MazdaRX8Arduino** (This) | ECU Replacement | Leonardo + Mega | ✅ Yes | - |
+| **MazdaRX8Arduino** (This) | ECU Replacement (ICE) | Leonardo + Mega | ✅ Yes | - |
+| **RX8-dash-CAN-controller** | ECU Replacement (EV) | Arduino Nano | ✅ Yes | 0 |
 | ESP8266 Companion | WiFi/BT for AC Display | ESP8266 | ❌ No | 2 |
 | rx8-reverse-engineering | CAN Documentation | None (docs) | ❌ No | 25 |
 | RX8-CAN-BUS | Telemetry PIDs | OBD scanner | ❌ No | - |
@@ -334,10 +386,16 @@ The projects below are organized by how they relate to our project.
 
 ### You want to... Use this project:
 
-**Replace the ECU entirely** → **MazdaRX8Arduino** (this project)
-- Engine swaps
+**Replace the ECU (gasoline engine)** → **MazdaRX8Arduino** (this project)
+- Engine swaps (rotary, LS, JZ, etc.)
 - Aftermarket engine management
 - Complete control system replacement
+
+**Replace the ECU (electric motor)** → **RX8-dash-CAN-controller** (EV8-Steve)
+- Electric vehicle conversion
+- Open Inverter integration
+- Map motor data to dashboard
+- ICE → EV conversion
 
 **Add WiFi/Bluetooth to AC Display** → **ESP8266 Companion**
 - Data logging

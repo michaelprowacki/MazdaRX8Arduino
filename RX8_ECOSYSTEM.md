@@ -27,9 +27,60 @@ Tools that complement but don't integrate directly.
 
 ## Detailed Analysis
 
-### CATEGORY 1: DIRECT INTEGRATION CANDIDATES
+### CATEGORY 1: SISTER PROJECTS (Nearly Identical)
 
-#### 1.1 ESP8266 Companion (INTEGRATE - HIGH PRIORITY)
+#### 1.0 RX8-dash-CAN-controller - EV Conversion (REFERENCE - VERY HIGH RELEVANCE)
+
+**Repository**: https://github.com/EV8-Steve/RX8-dash-CAN-controller
+
+**Purpose**: RX8 dashboard integration for electric vehicle conversions
+
+**Languages**: C++ (100%)
+
+**Key Features**:
+- Arduino Nano based CAN controller (vs our Leonardo)
+- Integrates with Open Inverter (popular open-source EV motor controller)
+- Uses exact same CAN messages (0x201, 0x420, etc.)
+- Maps electric motor data → ICE-equivalent dashboard signals
+- 8kHz PWM for motor control
+- Odometer pulse generation
+- Wheel speed monitoring
+- ABS system integration
+- Power Assisted Steering support
+
+**Integration Strategy**: 📚 **REFERENCE FOR EV FEATURES**
+
+```
+Recommendation: Reference, potentially merge EV-specific features
+
+Rationale:
+- Solves the SAME problem but for EV instead of ICE
+- Nearly identical code structure to ours
+- Same CAN messages, different data sources
+- Could add "EV mode" option to our project
+
+What We Can Learn:
+- Odometer pulse generation code (we don't have this)
+- Open Inverter CAN integration
+- Motor → engine signal mapping
+- 8kHz PWM techniques
+
+Integration Options:
+A. Reference only - link in docs (RECOMMENDED)
+B. Extract odometer pulse code
+C. Add optional EV mode to RX8_CANBUS.ino
+D. Create separate EV_ECU_Module/ (if demand exists)
+
+Relevance: ⭐⭐⭐⭐⭐ EXTREMELY HIGH - Sister project
+```
+
+**Status**: REFERENCE - Document for EV conversion users
+
+---
+
+### CATEGORY 2: DIRECT INTEGRATION CANDIDATES
+
+#### 2.1 ESP8266 Companion (INTEGRATE - HIGH PRIORITY)
 
 **Repository**:
 - https://github.com/michaelprowacki/S1-RX8-AC-Display-ESP8266-Companion
@@ -75,7 +126,7 @@ Files to integrate:
 
 ---
 
-#### 1.2 RX8 Reverse Engineering Wiki Data (REFERENCE - HIGH PRIORITY)
+#### 2.2 RX8 Reverse Engineering Wiki Data (REFERENCE - HIGH PRIORITY)
 
 **Repository**: https://github.com/rnd-ash/rx8-reverse-engineering
 
@@ -113,7 +164,7 @@ Files to integrate:
 
 ---
 
-#### 1.3 RX8 CAN Bus PID Documentation (REFERENCE - HIGH PRIORITY)
+#### 2.3 RX8 CAN Bus PID Documentation (REFERENCE - HIGH PRIORITY)
 
 **Repository**: https://github.com/topolittle/RX8-CAN-BUS
 
@@ -153,7 +204,7 @@ Notable PIDs to consider adding:
 
 ---
 
-#### 1.4 RX8-Dash CAN Protocol Implementation (REFERENCE - MEDIUM PRIORITY)
+#### 2.4 RX8-Dash CAN Protocol Implementation (REFERENCE - MEDIUM PRIORITY)
 
 **Repository**: https://github.com/Antipixel/RX8-Dash
 
@@ -196,9 +247,9 @@ Cross-validation:
 
 ---
 
-### CATEGORY 2: SEPARATE MODULE CANDIDATES
+### CATEGORY 3: SEPARATE MODULE CANDIDATES
 
-#### 2.1 Arduino Display OBD2/CAN (OPTIONAL MODULE - MEDIUM PRIORITY)
+#### 3.1 Arduino Display OBD2/CAN (OPTIONAL MODULE - MEDIUM PRIORITY)
 
 **Repository**: https://github.com/Radivv/arduino-display-obd2-can-mazda-rx8
 
@@ -239,7 +290,7 @@ Potential uses:
 
 ---
 
-#### 2.2 RX8 Coolant Monitor (OPTIONAL MODULE - MEDIUM PRIORITY)
+#### 3.2 RX8 Coolant Monitor (OPTIONAL MODULE - MEDIUM PRIORITY)
 
 **Repository**: https://github.com/topolittle/rx8-coolant-monitor
 
@@ -287,7 +338,7 @@ What to extract:
 
 ---
 
-#### 2.3 RX8 Wipers Speed-Sensitive System (OPTIONAL MODULE - LOW PRIORITY)
+#### 3.3 RX8 Wipers Speed-Sensitive System (OPTIONAL MODULE - LOW PRIORITY)
 
 **Repository**: https://github.com/basilhussain/rx8-wipers
 
@@ -327,9 +378,9 @@ Useful for:
 
 ---
 
-### CATEGORY 3: EXTERNAL TOOL REFERENCES
+### CATEGORY 4: EXTERNAL TOOL REFERENCES
 
-#### 3.1 RX8 ECU Dump Tool (EXTERNAL TOOL - HIGH PRIORITY REFERENCE)
+#### 4.1 RX8 ECU Dump Tool (EXTERNAL TOOL - HIGH PRIORITY REFERENCE)
 
 **Repository**: https://github.com/ConnorRigby/rx8-ecu-dump
 
@@ -381,7 +432,7 @@ It completely replaces the ECU functionality.
 
 ---
 
-#### 3.2 RX8Defs - ECU Definitions (EXTERNAL REFERENCE - MEDIUM PRIORITY)
+#### 4.2 RX8Defs - ECU Definitions (EXTERNAL REFERENCE - MEDIUM PRIORITY)
 
 **Repository**: https://github.com/Rx8Man/RX8Defs
 
@@ -424,7 +475,7 @@ These are different approaches:
 
 ---
 
-#### 3.3 Rx8Man Reflash Tool (EXTERNAL TOOL - MEDIUM PRIORITY)
+#### 4.3 Rx8Man Reflash Tool (EXTERNAL TOOL - MEDIUM PRIORITY)
 
 **Repository**: https://github.com/Rx8Man/Rx8Man
 
@@ -470,7 +521,7 @@ Choose based on your needs.
 
 ---
 
-#### 3.4 Mazda RX8 PCM Reverse Engineering (EXTERNAL REFERENCE - LOW PRIORITY)
+#### 4.4 Mazda RX8 PCM Reverse Engineering (EXTERNAL REFERENCE - LOW PRIORITY)
 
 **Repository**: https://github.com/equinox311/Mazda_RX8_PCM_ReverseEngineering
 
@@ -510,7 +561,7 @@ These help understand what algorithms/logic the factory uses.
 
 ---
 
-#### 3.5 GROM RomRaider (EXTERNAL TOOL - LOW PRIORITY)
+#### 4.5 GROM RomRaider (EXTERNAL TOOL - LOW PRIORITY)
 
 **Repository**: https://github.com/equinox311/GROM_RomRaider
 
@@ -541,7 +592,7 @@ No integration needed - reference only
 
 ---
 
-#### 3.6 RX8-Arduino Sim Racing (REFERENCE - LOW PRIORITY)
+#### 4.6 RX8-Arduino Sim Racing (REFERENCE - LOW PRIORITY)
 
 **Repository**: https://github.com/Izekeal/rx8-arduino
 
