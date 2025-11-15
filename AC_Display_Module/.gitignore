@@ -1,0 +1,35 @@
+# PlatformIO
+.pio
+.pioenvs
+.piolibdeps
+.vscode/
+
+# Build artifacts
+*.o
+*.elf
+*.hex
+*.bin
+*.eep
+*.lss
+*.map
+*.sym
+
+# IDE files
+.vscode/
+.idea/
+*.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*~
+
+# Library directories (when using external libraries)
+# lib/*/
+
+# Test output
+test/output/

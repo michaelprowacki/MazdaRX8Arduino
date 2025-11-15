@@ -18,9 +18,23 @@ This is an **Arduino-based ECU/PCM replacement** for the Mazda Mark 1 RX8. The p
 
 ```
 MazdaRX8Arduino/
-├── RX8_CANBUS.ino              # Main Arduino sketch (PRIMARY CODE FILE)
+├── RX8_CANBUS.ino              # Main Arduino sketch (PRIMARY ECU CODE FILE)
 ├── README.md                    # Project introduction and donation info
 ├── CLAUDE.md                    # This file - AI assistant guide
+│
+├── AC_Display_Module/          # AC Display Controller (NEW MODULE)
+│   ├── README.md               # AC module documentation
+│   ├── platformio.ini          # PlatformIO configuration
+│   ├── src/                    # Source files
+│   │   ├── main.cpp           # Main AC display code
+│   │   └── main.hpp           # Main header file
+│   ├── include/               # Header files
+│   │   ├── pins.h             # Pin definitions
+│   │   └── data_types.h       # Common data structures
+│   ├── lib/                   # Custom libraries (see lib/README.md)
+│   │   └── README.md          # Library documentation
+│   └── docs/                  # Additional documentation
+│       └── integration.md     # Integration guide
 │
 ├── Documentation/
 │   ├── 08_Steering.pdf         # Steering system documentation
@@ -543,6 +557,220 @@ Code contains snippets from various sources accumulated during research. If you 
 - **Throttle safety**: Lines 329-331
 - **Speed safety**: Lines 314-319
 - **CAN messages**: Lines 83-99 (arrays), 254-266 (transmission)
+
+---
+
+## AC Display Module
+
+### Overview
+
+The **AC_Display_Module** is a separate Arduino Mega 2560-based controller for the factory AC display unit. This module was integrated from the [S1-RX8-AC-Display-controller](https://github.com/michaelprowacki/S1-RX8-AC-Display-controller) project.
+
+**Purpose**: Control the factory AC display independently of the main ECU, enabling:
+- Custom display pages (battery voltage, motor temperature)
+- Menu system for configuration
+- Real-time clock display
+- AC amplifier control
+- Subwoofer DSP management
+
+### Module Architecture
+
+**Hardware**: Arduino Mega 2560 (ATmega2560)
+**Framework**: Arduino/PlatformIO
+**Build System**: PlatformIO (recommended) or Arduino IDE
+
+### Key Components
+
+1. **Button Panel** (`buttonPanel`)
+   - 4x2 button matrix scanning
+   - 2x rotary encoders (fan speed, temperature)
+   - Long-press detection
+   - Debouncing
+
+2. **Display Controller** (`display`)
+   - 7-segment display driver (SPI)
+   - LED matrix control
+   - Icon management
+   - Time display
+
+3. **AC Amplifier** (`acAmp`)
+   - Serial communication with factory amplifier
+   - State management
+   - Mode control
+
+4. **Menu System**
+   - `mainMenu` - Primary interface
+   - `confMenu` - Configuration settings
+   - `subVolMenu` - Subwoofer volume control
+   - `baseMenu` - Menu foundation
+
+5. **Real-Time Clock** (`clock`)
+   - I2C RTC interface
+   - 12/24 hour format
+   - Minute change detection
+
+6. **Backlight Manager** (`backlightLed`)
+   - PWM dimming
+   - Automatic brightness
+   - Multi-LED support
+
+7. **ESP8266 Communication** (`espComm`)
+   - Optional Bluetooth/WiFi bridge
+   - Data logging
+   - OBD-II integration
+
+### Pin Configuration (Arduino Mega)
+
+See `AC_Display_Module/include/pins.h` for complete definitions:
+
+- **Encoders**: Pins 2, 3, 18, 19 (interrupt-capable)
+- **Button Matrix**: Pins 22-25 (rows), 29, 31 (columns)
+- **SPI Display**: Pins 51 (MOSI), 52 (SCK), 53 (SS)
+- **AC Amplifier Serial**: Pins 16 (TX), 17 (RX)
+- **Backlight**: Pins 9, 12
+- **Analog Sensing**: A4 (battery), A8, A11 (backlight)
+
+### Data Structures
+
+Key structures defined in `AC_Display_Module/include/data_types.h`:
+
+```cpp
+enum btn_enum {
+    Auto, Mode, AC, frontDemist, rearDemist, AirSource, Off
+};
+
+struct buttonState {
+    int fanRotation;
+    int tempRotation;
+    btn_enum shortPushButton;
+    btn_enum longPushButton;
+};
+
+struct acShow {
+    uint8_t fanSpeed;
+    uint8_t tempDigits[3];
+    bool stateAuto, stateAc;
+    bool modeFrontDemist, modeRearDemist, modeRecirculate;
+    // ... additional states
+};
+```
+
+### Integration Options
+
+#### Option 1: Standalone Operation
+- AC Display runs independently
+- No connection to main ECU
+- Simplest setup
+
+#### Option 2: Serial Communication
+- Connect Leonardo TX/RX to Mega Serial3
+- Share data: RPM, speed, temperature
+- Protocol: `$CMD:VALUE\n` format
+
+#### Option 3: CAN Bus Integration
+- Add MCP2515 to Mega
+- Share CAN bus with main ECU
+- Read wheel speeds, RPM, warnings
+
+See `AC_Display_Module/docs/integration.md` for detailed integration guide.
+
+### Building the Module
+
+#### Using PlatformIO (Recommended)
+```bash
+cd AC_Display_Module
+pio run                # Build
+pio run -t upload      # Upload
+pio device monitor     # Serial monitor
+```
+
+#### Using Arduino IDE
+1. Install required libraries:
+   - Adafruit RTClib (v2.1.1+)
+   - Adafruit BusIO (v1.14.5+)
+   - Encoder by Paul Stoffregen (v1.4.2+)
+   - Smoothed (v1.2+)
+2. Open `AC_Display_Module/src/main.cpp`
+3. Select Board: Arduino Mega 2560
+4. Upload
+
+### Custom Libraries
+
+The module uses 13 custom libraries in `AC_Display_Module/lib/`:
+- acAmp, backlightLed, baseMenu, buttonPanel
+- clock, command_parser, confMenu, display
+- dsp, espComm, logger, mainMenu, subVolMenu
+
+**Note**: Libraries are **not included** to keep repository lightweight. Obtain from:
+https://github.com/michaelprowacki/S1-RX8-AC-Display-controller
+
+See `AC_Display_Module/lib/README.md` for installation instructions.
+
+### Key Features
+
+1. **Battery Voltage Monitoring**
+   - Reads from A4 with voltage divider
+   - Smoothing filter (10-sample average)
+   - Display on custom menu page
+
+2. **Motor Temperature Display**
+   - Custom menu page
+   - Could be linked to CAN bus data
+   - Configurable units (C/F)
+
+3. **Menu Navigation**
+   - Short press: AC control
+   - Long press: Menu functions
+   - Auto (long): Toggle ambient temp
+   - Mode (long): Configuration menu
+   - Off (long): Subwoofer menu
+
+4. **Display Update Strategy**
+   - Update only on change
+   - Minute change triggers time update
+   - Menu change triggers full redraw
+   - Optimized for minimal flicker
+
+### AI Assistant Guidelines for AC Module
+
+1. **Separate Concerns**: This module is independent from RX8_CANBUS.ino
+2. **Hardware Differences**: Mega 2560, not Leonardo
+3. **Library Dependencies**: Check lib/README.md before modifying
+4. **Integration**: Read docs/integration.md for multi-module scenarios
+5. **Testing**: Can be bench-tested without vehicle
+6. **Serial Protocol**: Use consistent format if implementing communication
+
+### Common Modifications for AC Module
+
+#### Add Custom Menu Page
+```cpp
+// In setup()
+mainMenu.registerPage(new mainMenuFuncPage("OIL", getOilPressure, "PSI", 0));
+```
+
+#### Change Button Long-Press Action
+```cpp
+// In longButtonAction()
+case Auto:
+    // Your custom action here
+    break;
+```
+
+#### Adjust Voltage Calibration
+```cpp
+// In main.hpp, modify:
+#define VOLTAGE_CONVERSION_FACTOR 0.01487643158529234
+// Calibrate based on actual voltage divider resistors
+```
+
+### Module File Reference
+
+- **Main code**: `AC_Display_Module/src/main.cpp`
+- **Pin definitions**: `AC_Display_Module/include/pins.h`
+- **Data types**: `AC_Display_Module/include/data_types.h`
+- **Configuration**: `AC_Display_Module/platformio.ini`
+- **Integration guide**: `AC_Display_Module/docs/integration.md`
+- **Module README**: `AC_Display_Module/README.md`
 
 ---
 
