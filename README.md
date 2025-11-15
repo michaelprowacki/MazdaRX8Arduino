@@ -136,6 +136,9 @@ MazdaRX8Arduino/
 
 ### For Developers
 
+- **[lib/RX8_CAN_Messages.h](lib/RX8_CAN_Messages.h)** - Comprehensive CAN message decoder/encoder library (NEW!)
+- **[lib/README.md](lib/README.md)** - Complete library documentation with examples
+- **[examples/](examples/)** - Working examples (CAN decoder, OLED displays, etc.)
 - **[CLAUDE.md](CLAUDE.md)** - Comprehensive guide for AI assistants and developers (550+ lines)
 - **[Documentation/CAN_PID_Reference.md](Documentation/CAN_PID_Reference.md)** - Complete CAN protocol reference (600+ lines)
 - **[Documentation/rx8_can_database.dbc](Documentation/rx8_can_database.dbc)** - CAN signal definitions (import to SavvyCAN, Kayak, Wireshark)
@@ -171,6 +174,35 @@ MazdaRX8Arduino/
 - 📡 **WiFi/Bluetooth**: ESP8266 companion for data logging and OTA updates
 - 🏁 **Sim Racing**: Drive real RX8 cluster from PC games
 - 💧 **Smart Wipers**: Speed-sensitive intermittent timing
+
+### 🆕 CAN Message Decoder Library
+
+**NEW**: Comprehensive library for decoding/encoding all RX8 CAN messages
+
+```cpp
+#include "RX8_CAN_Messages.h"
+RX8_CAN_Decoder decoder;
+
+// Decode CAN message
+decoder.decode0x201(canBuffer);  // RPM, Speed, Throttle
+int rpm = decoder.pcmStatus.engineRPM;
+int speed = decoder.pcmStatus.vehicleSpeed;
+
+// Helper functions
+int tempC = decoder.tempToCelsius(rawTemp);
+bool warning = decoder.hasActiveWarnings();
+decoder.printAll(Serial);  // Debug output
+```
+
+**Features**:
+- ✅ All major CAN messages (0x201, 0x420, 0x4B0/1, 0x4BE, 0x075, etc.)
+- ✅ Structured data access (no manual bit shifting)
+- ✅ Unit conversions (MPH/KPH, C/F, degrees, G-forces)
+- ✅ Validation helpers (temp normal, warnings active, etc.)
+- ✅ Encoding for transmitting modules
+- ✅ Zero external dependencies
+
+**Documentation**: See [lib/README.md](lib/README.md) for API reference and examples
 
 ---
 

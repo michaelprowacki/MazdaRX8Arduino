@@ -4,6 +4,34 @@
 
 This repository contains multiple Arduino-based modules for the Mazda RX8. Each module serves a specific purpose and can work independently or in combination with others. This guide explains how to integrate these modules into a complete RX8 electronics system.
 
+### NEW: CAN Message Decoder Library
+
+This repository now includes a **comprehensive CAN message decoder library** (`lib/RX8_CAN_Messages.h`) that makes it easy to decode all RX8 CAN messages:
+
+- ✅ Decode RPM, Speed, Throttle (0x201)
+- ✅ Decode Warning Lights, Temperature (0x420)
+- ✅ Decode Wheel Speeds (0x4B0, 0x4B1)
+- ✅ Decode Steering Angle (0x4BE)
+- ✅ Decode Accelerometer (0x075)
+- ✅ Encode messages for transmitting
+- ✅ Helper functions (unit conversions, validation)
+- ✅ Zero external dependencies
+
+**Quick Example**:
+```cpp
+#include "RX8_CAN_Messages.h"
+RX8_CAN_Decoder decoder;
+
+// In your CAN receive loop:
+if(rxId == 0x201) {
+  decoder.decode0x201(rxBuf);
+  int rpm = decoder.pcmStatus.engineRPM;
+  int speed = decoder.pcmStatus.vehicleSpeed;
+}
+```
+
+See `lib/README.md` for complete documentation and examples.
+
 ---
 
 ## Module Categories
