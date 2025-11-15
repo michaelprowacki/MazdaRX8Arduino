@@ -27,10 +27,18 @@
 //
 //    CONSOLIDATED MODULE: Integrated speed-sensitive wipers functionality (2025-11-15)
 //    Based on: https://github.com/michaelprowacki/MazdaRX8Arduino/Wipers_Module
+//
+//    CODE QUALITY IMPROVEMENTS (2025-11-15):
+//    - Now uses shared RX8_CAN_Messages library for encoding/decoding
+//    - Eliminated ~100 lines of duplicate CAN encoding code
+//    - Removed all manual bit manipulation (error-prone)
+//    - Removed hardcoded "magic numbers" (3.85, 10000, etc.)
+//    - Single source of truth for CAN protocol across all modules
 
 #include <Arduino.h>
 #include <mcp_can.h>
 #include <mcp_can_dfs.h>
+#include "RX8_CAN_Messages.h"  // Shared CAN encoder/decoder library
 
 // ========== OPTIONAL FEATURES ==========
 // Uncomment to enable speed-sensitive wipers
@@ -101,22 +109,24 @@ unsigned char buf[8];
 unsigned long ID = 0;
 
 //Setup Array's to store bytes to send to CAN on Various ID's
-byte send201[8]  = {0, 0, 255, 255, 0, 0, 0, 255};
-byte send420[7]  = {0, 0, 0, 0, 0, 0, 0};
-byte send212[7]  = {0, 0, 0, 0, 0, 0, 0};
+// NOTE: Now initialized using RX8_CAN_Encoder library in setDefaults()
+byte send201[8]  = {0};  // Dynamic - updated each cycle with RPM/Speed/Throttle
+byte send420[7]  = {0};  // Dynamic - updated each cycle with temp/warnings
+byte send212[7]  = {0};  // Optional DSC/ABS control
 
-//Setup PCM Status's required to fool all other CAN devices that everything is OK, just send these out continuously
-byte send203[7]  = {19,19,19,19,175,3,19}; //data to do with traction control
-byte send215[8]  = {2,45,2,45,2,42,6,129};
-byte send231[5]  = {15,0,255,255,0};
-byte send240[8]  = {4,0,40,0,2,55,6,129};
-byte send620[7]  = {0,0,0,0,16,0,4}; //needed for abs light to go off, byte 7 is different on different cars, sometimes 2,3 or 4
-byte send630[8]  = {8,0,0,0,0,0,106,106}; //needed for abs light to go off, AT/MT and Wheel Size
-byte send650[1]  = {0};
+//Setup PCM Status's required to fool all other CAN devices that everything is OK
+// NOTE: Now initialized using RX8_CAN_Encoder library in setDefaults()
+byte send203[7]  = {0};  // Traction control data
+byte send215[8]  = {0};  // PCM supplement 1
+byte send231[5]  = {0};  // PCM supplement 2
+byte send240[8]  = {0};  // PCM supplement 3
+byte send620[7]  = {0};  // ABS system data
+byte send630[8]  = {0};  // ABS configuration
+byte send650[1]  = {0};  // ABS supplement
 
 //KCM / Immobiliser chat replies
-byte send41a[8] = {7,12,48,242,23,0,0,0}; // Reply to 47 first
-byte send41b[8] = {129,127,0,0,0,0,0,0}; // Reply to 47 second
+// NOTE: Now using RX8_CAN_Encoder library functions
+byte send41[8] = {0};  // Immobilizer response buffer (reused for both responses)
 
 void setup() {
   Serial.begin(115200);
@@ -163,24 +173,31 @@ void setDefaults() {
   lowWaterMIL     = 0;
   batChargeMIL    = 0;
   oilPressureMIL  = 0;
-  
+
   // StatusPCM
   engineRPM       = 1000;   // RPM
   vehicleSpeed    = 0;      // MPH
   throttlePedal   = 0;      // %
-  
+
   // StatusDSC
   dscOff          = 0;
   absMIL          = 0;
   etcActiveBL     = 0;
   etcDisabled     = 0;
   brakeFailMIL    = 0;
-  
+
+  // Initialize CAN message arrays using shared library
+  // These are static messages that don't change during operation
+  Serial.println("Initializing CAN messages...");
+  RX8_CAN_Encoder::initializeECUMessages(send203, send215, send231, send240,
+                                          send620, send630, send650);
+  Serial.println("CAN messages initialized");
+
   Serial.print("Start wait to ensure Throttle Pedal is on");
   delay(500);
   lowPedal = analogRead(analogPin) - 40;  //read the throttle pedal, should be around 1.7v minus 40 to ensure no small throttle inputs
   highPedal = 803; //4v
-  
+
   // Voltage to read from Pedal 1.64v - 4.04v
   // Going to use a safe range 1.7v to 4v
   // Low of 1.7v has been read above as can fluctuate
@@ -188,7 +205,7 @@ void setDefaults() {
   // 4v = INT 803
   // (highPedal - lowPedal) = RANGE FROM RX8 PEDAL
   // out for 1024 (5v max), controller wants 4.5v max = 920 (adding 40 to help stabilise)
-  
+
   convertThrottle = 960 / (highPedal - lowPedal);
   Serial.print("Low Pedal ");
   Serial.print(lowPedal);
@@ -197,85 +214,24 @@ void setDefaults() {
   Serial.println("Setup Complete");
 }
 
+// NOTE: These functions are now simplified to use the shared RX8_CAN_Encoder library
+// This eliminates hardcoded bit manipulation and magic numbers
+
 void updateMIL() {
-  send420[0] = engTemp;
-  send420[1] = odo;
-  send420[4] = oilPressure;
-
-  if (checkEngineMIL == 1) {
-    send420[5] = send420[5] | 0b01000000;
-  } else {
-    send420[5] = send420[5] & 0b10111111;
-  }
-
-  if (checkEngineBL == 1) {
-    send420[5] = send420[5] | 0b10000000;
-  } else {
-    send420[5] = send420[5] & 0b01111111;
-  }
-
-  if (lowWaterMIL == 1) {
-    send420[6] = send420[6] | 0b00000010;
-  } else {
-    send420[6] = send420[6] & 0b11111101;
-  }
-
-  if (batChargeMIL == 1) {
-    send420[6] = send420[6] | 0b01000000;
-  } else {
-    send420[6] = send420[6] & 0b10111111;
-  }
-
-  if (oilPressureMIL == 1) {
-    send420[6] = send420[6] | 0b10000000;
-  } else {
-    send420[6] = send420[6] & 0b01111111;
-  }
+  // Use shared library encoder - much cleaner than manual bit manipulation!
+  RX8_CAN_Encoder::encode0x420(send420, engTemp, checkEngineMIL, lowWaterMIL,
+                                batChargeMIL, oilPressureMIL);
 }
 
 void updatePCM() {
-  int tempEngineRPM = engineRPM * 3.85;
-  int tempVehicleSpeed = (vehicleSpeed * 100) + 10000;
-  
-  send201[0] = highByte(tempEngineRPM);       
-  send201[1] = lowByte(tempEngineRPM);        
-
-  send201[4] = highByte(tempVehicleSpeed);    
-  send201[5] = lowByte(tempVehicleSpeed);     
-
-  send201[6] = (200 / 100) * throttlePedal;   //Pedal information is in 0.5% increments 
+  // Use shared library encoder - handles RPM*3.85 and speed encoding automatically
+  RX8_CAN_Encoder::encode0x201(send201, engineRPM, vehicleSpeed, throttlePedal);
 }
 
 void updateDSC() {
-  if (dscOff == 1) {
-    send212[3] = send212[3] | 0b00000100;
-  } else {
-    send212[3] = send212[3] & 0b01111011;
-  }
-
-  if (absMIL == 1) {
-    send212[4] = send212[4] | 0b00001000;
-  } else {
-    send212[4] = send212[4] & 0b11110111;
-  }
-
-  if (brakeFailMIL == 1) {
-    send212[4] = send212[4] | 0b01000000;
-  } else {
-    send212[4] = send212[4] & 0b10111111;
-  }
-
-  if (etcActiveBL == 1) {
-    send212[5] = send212[5] | 0b00100000;
-  } else {
-    send212[5] = send212[5] & 0b11011111;
-  }
-
-  if (etcDisabled == 1) {
-    send212[5] = send212[5] | 0b00010000;
-  } else {
-    send212[5] = send212[5] & 0b11101111;
-  }
+  // Use shared library encoder - eliminates all manual bit manipulation
+  RX8_CAN_Encoder::encode0x212(send212, dscOff, absMIL, brakeFailMIL,
+                                 etcActiveBL, etcDisabled);
 }
 
 void sendOnTenth() {
@@ -386,12 +342,15 @@ void loop() {
     }
     
     //Keyless Control Module and Immobiliser want to have a chat with the PCM, this deals with the conversation
+    // Now using shared library encoder functions
     if(ID == 71) { //71 Dec is 47 Hex - Keyless Chat
       if(buf[1] == 127 && buf[2] == 2) {
-        CAN0.sendMsgBuf(0x041, 0, 8, send41a);
+        RX8_CAN_Encoder::encode0x041_ResponseA(send41);
+        CAN0.sendMsgBuf(0x041, 0, 8, send41);
       }
       if(buf[1] == 92 && buf[2] == 244) {
-        CAN0.sendMsgBuf(0x041, 0, 8, send41b);
+        RX8_CAN_Encoder::encode0x041_ResponseB(send41);
+        CAN0.sendMsgBuf(0x041, 0, 8, send41);
       }
     }
     

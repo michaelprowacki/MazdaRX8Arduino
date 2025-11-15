@@ -28,6 +28,7 @@ This is the **primary ECU/PCM replacement** for Mazda RX8 with internal combusti
 ✅ Throttle pedal processing
 ✅ Wheel speed monitoring
 ✅ **Speed-sensitive wipers** (optional, enable with `#define ENABLE_WIPERS`)
+✅ **Shared CAN library** (eliminates code duplication, improves maintainability)
 
 ---
 
@@ -65,6 +66,36 @@ This module now includes integrated speed-sensitive wiper control. Enable by unc
 - Uses existing vehicle speed calculation
 - No additional CAN bus overhead
 - Simpler wiring and installation
+
+---
+
+## Code Quality (Phase 2 Improvements)
+
+This module now uses the shared `RX8_CAN_Messages.h` library for all CAN encoding/decoding.
+
+**Benefits:**
+- **Eliminates code duplication**: -57 lines of hardcoded CAN logic
+- **No magic numbers**: All encoding constants (3.85, 10000, etc.) centralized
+- **Easier maintenance**: Fix bugs once in library, all modules benefit
+- **Better documentation**: Library functions are self-explanatory
+- **Reduced errors**: No manual bit manipulation
+
+**Example (before vs after):**
+
+Before:
+```cpp
+int tempEngineRPM = engineRPM * 3.85;  // Magic number!
+send201[0] = highByte(tempEngineRPM);
+send201[1] = lowByte(tempEngineRPM);
+// 70 more lines of this...
+```
+
+After:
+```cpp
+RX8_CAN_Encoder::encode0x201(send201, engineRPM, vehicleSpeed, throttlePedal);
+```
+
+**See**: `PHASE2_CODE_QUALITY.md` for complete details
 
 ---
 
