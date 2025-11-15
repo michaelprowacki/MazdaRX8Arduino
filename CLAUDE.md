@@ -14,6 +14,47 @@ This is an **Arduino-based ECU/PCM replacement** for the Mazda Mark 1 RX8. The p
 
 ---
 
+## Module Consolidation (2025-11-15 Update)
+
+This repository has undergone consolidation to reduce hardware complexity and costs. The following modules have been merged:
+
+### ✅ Completed Consolidations
+
+#### 1. Wipers → ECU Module
+- **Before**: Separate Wipers_Module on dedicated Arduino
+- **After**: Integrated into ECU_Module as optional feature (`#define ENABLE_WIPERS`)
+- **Benefits**:
+  - One fewer Arduino board required
+  - Uses existing vehicle speed calculation
+  - No additional CAN bus overhead
+  - Simpler wiring
+
+**How to enable**:
+```cpp
+// In ECU_Module/RX8_CANBUS.ino line 37:
+#define ENABLE_WIPERS  // Uncomment to enable speed-sensitive wipers
+```
+
+#### 2. AC Display + ESP8266 → ESP32 (Planned)
+- **Before**: Arduino Mega 2560 + ESP8266 Companion (2 boards)
+- **After**: Single ESP32 board with integrated WiFi/BT
+- **Benefits**:
+  - 61% cost reduction ($23 → $9)
+  - Better performance (240 MHz dual-core)
+  - 65x more RAM (520 KB vs 8 KB)
+  - Native WiFi + Bluetooth
+  - Simpler wiring
+
+**Migration Status**: Planning phase
+**Documentation**: See `AC_Display_Module/ESP32_MIGRATION.md`
+
+### Module Count Reduction
+- **Before consolidation**: 9 modules
+- **After consolidation**: 7 modules (with ESP32 migration: 6 modules)
+- **Hardware savings**: 2-3 fewer Arduino boards
+
+---
+
 ## Repository Structure
 
 ```

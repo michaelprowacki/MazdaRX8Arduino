@@ -10,27 +10,41 @@
 //    RPM Controllable
 //    Vehicle Speed set by Wheel Sensors
 //    Warning lights turned off (you can turn them on in the code if you wish)
+//    Speed-Sensitive Wipers (optional - enable with ENABLE_WIPERS below)
 //
 //    Written by David Blackhurst, dave@blackhurst.co.uk 06/10/2019
 //
 //    Some parts of this code have been dissected from other sources - in researching this project I copied a lot of code to play with
 //    Sorry if some of this is yours - just let me know and I will attribute it to you.
 //
-//    I have throttle pedal code in here to translate the output of the primary throttle signal to the range my controller required. This is unlikely to be helpful to anyone else 
+//    I have throttle pedal code in here to translate the output of the primary throttle signal to the range my controller required. This is unlikely to be helpful to anyone else
 //    unless you happen to have the dodgy chinese controller I have.
 //
 //    Again use AT YOUR OWN RISK
 //
-//    DONATE HERE, Anything helps towards the next project (Leaf RX8 Conversion). 
+//    DONATE HERE, Anything helps towards the next project (Leaf RX8 Conversion).
 //    https://www.paypal.me/DBlackhurst
+//
+//    CONSOLIDATED MODULE: Integrated speed-sensitive wipers functionality (2025-11-15)
+//    Based on: https://github.com/michaelprowacki/MazdaRX8Arduino/Wipers_Module
 
 #include <Arduino.h>
 #include <mcp_can.h>
 #include <mcp_can_dfs.h>
 
+// ========== OPTIONAL FEATURES ==========
+// Uncomment to enable speed-sensitive wipers
+// #define ENABLE_WIPERS
+
+// ========== PIN DEFINITIONS ==========
 #define CANint 2
 #define LED2 8
 #define LED3 7
+
+#ifdef ENABLE_WIPERS
+#define WIPER_CONTROL_PIN 6    // Digital pin for wiper control (adjust as needed)
+#define WIPER_SENSE_PIN 4      // Optional: wiper position feedback
+#endif
 
 MCP_CAN CAN0(17); // Set CS to pin 17
 
@@ -74,6 +88,13 @@ int frontRight;
 int rearLeft;
 int rearRight;
 
+#ifdef ENABLE_WIPERS
+// Variables for Speed-Sensitive Wipers
+int wiperDelay = 2000;           // Default 2 seconds between wipes
+unsigned long lastWipe = 0;      // Timestamp of last wiper activation
+bool wiperEnabled = true;        // Master enable for wiper control
+#endif
+
 //Variables for reading in from the CANBUS
 unsigned char len = 0;
 unsigned char buf[8];
@@ -99,7 +120,7 @@ byte send41b[8] = {129,127,0,0,0,0,0,0}; // Reply to 47 second
 
 void setup() {
   Serial.begin(115200);
-  
+
   pinMode(23,OUTPUT);
   digitalWrite(23,HIGH);
   Serial.println("Start Setup");
@@ -110,6 +131,14 @@ void setup() {
 
   digitalWrite(LED2, LOW);
 
+#ifdef ENABLE_WIPERS
+  // Initialize wiper control pins
+  pinMode(WIPER_CONTROL_PIN, OUTPUT);
+  digitalWrite(WIPER_CONTROL_PIN, LOW);  // Ensure wipers are off initially
+  pinMode(WIPER_SENSE_PIN, INPUT);
+  Serial.println("Speed-Sensitive Wipers: ENABLED");
+#endif
+
   if (CAN0.begin(CAN_500KBPS) == CAN_OK) {
     Serial.println("Found High Speed CAN");
   } else {
@@ -119,7 +148,7 @@ void setup() {
       delay(1000);
     }
   }
-  
+
   setDefaults(); //This will wait 0.5 second to ensure the Thottle Pedal is on, it will then take the Voltage as its zero throttle position
 }
 
@@ -271,13 +300,76 @@ void sendOnTenth() {
   */
 }
 
+#ifdef ENABLE_WIPERS
+/*
+ * Adjust wiper delay based on vehicle speed
+ * Speed-dependent timing for intermittent wiper mode
+ */
+void adjustWiperTiming() {
+  if (vehicleSpeed == 0) {
+    // Stopped - slow wiping
+    wiperDelay = 3000;  // 3 seconds
+  }
+  else if (vehicleSpeed < 20) {
+    // City driving - moderate wiping
+    wiperDelay = 2000;  // 2 seconds
+  }
+  else if (vehicleSpeed < 40) {
+    // Suburban - faster wiping
+    wiperDelay = 1500;  // 1.5 seconds
+  }
+  else if (vehicleSpeed < 60) {
+    // Highway - fast wiping
+    wiperDelay = 1000;  // 1 second
+  }
+  else {
+    // High speed - very fast wiping
+    wiperDelay = 500;   // 0.5 seconds
+  }
+}
+
+/*
+ * Control wiper operation with speed-adjusted timing
+ * Called from main loop
+ */
+void controlWipers() {
+  if (!wiperEnabled) {
+    return;  // Wipers disabled by user
+  }
+
+  // Adjust timing based on current vehicle speed
+  adjustWiperTiming();
+
+  // Check if it's time for next wipe
+  if (millis() - lastWipe >= wiperDelay) {
+    // Trigger wiper with short pulse
+    digitalWrite(WIPER_CONTROL_PIN, HIGH);
+    delay(100);  // 100ms pulse
+    digitalWrite(WIPER_CONTROL_PIN, LOW);
+
+    lastWipe = millis();
+
+    // Optional debug output
+    // Serial.print("Wipe at ");
+    // Serial.print(vehicleSpeed);
+    // Serial.print(" mph, delay: ");
+    // Serial.println(wiperDelay);
+  }
+}
+#endif
+
 void loop() {
   //Send information on the CanBud every 100ms to avoid spamming the system.
   if(millis() - lastRefreshTime >= 100) {
 		lastRefreshTime += 100;
     sendOnTenth();
 	}
-  
+
+#ifdef ENABLE_WIPERS
+  // Control speed-sensitive wipers (non-blocking)
+  controlWipers();
+#endif
+
   //Read the CAN and Respond if necessary or use data
   if(CAN_MSGAVAIL == CAN0.checkReceive()) { // Check to see whether data is read
     CAN0.readMsgBufID(&ID, &len, buf);    // Read data
