@@ -21,6 +21,7 @@ This module is integrated from the [S1-RX8-AC-Display-controller](https://github
 - **Temperature Monitoring**: Battery voltage and motor temperature display
 - **ESP8266 Companion Support**: Optional Bluetooth/ESP-Now bridging for data logging
 - **DSP Integration**: Digital Signal Processor control for audio systems
+- **🆕 CAN Bus Integration** (Optional): Read live engine data (RPM, speed, temperature) from ECU_Module
 
 ---
 
@@ -184,6 +185,16 @@ This module can work alongside the main `RX8_CANBUS.ino` code:
 - AC module can read wheel speed, RPM, etc.
 - Shared warning light status
 
+#### 🆕 Option 4: CAN Bus Data Display (NEW!)
+- Add MCP2515 CAN module to Mega
+- Read live engine data from ECU_Module (0x201, 0x420, 0x4B1)
+- Display RPM, speed, throttle, temperature as menu pages
+- Show ECU warnings on AC display
+- **See**: `CAN_INTEGRATION.md` for complete guide
+- **Example**: `examples/ac_display_with_CAN.ino`
+- **Performance**: 100ms update rate, minimal CPU overhead
+- **Use Case**: Multi-function display, ECU debugging, data logging
+
 ---
 
 ## Configuration
@@ -344,10 +355,10 @@ pio device monitor   # Open serial monitor
 
 ## Future Enhancements
 
-- [ ] Integration with main CAN bus controller
+- [x] Integration with main CAN bus controller (✅ Added - see `CAN_INTEGRATION.md`)
 - [ ] Additional menu customization options
 - [ ] Bluetooth audio streaming via ESP8266
-- [ ] Data logging to SD card
+- [ ] Data logging to SD card (CAN data → ESP8266 → Bluetooth/WiFi)
 - [ ] Custom display animations
 - [ ] Touchscreen interface support
 

@@ -204,6 +204,12 @@ decoder.printAll(Serial);  // Debug output
 
 **Documentation**: See [lib/README.md](lib/README.md) for API reference and examples
 
+**Integration Examples**:
+- [Aftermarket_Display_Module/additional_display_CAN_VERSION.ino](Aftermarket_Display_Module/additional_display_CAN_VERSION.ino) - 10x faster than OBD-II polling
+- [Wipers_Module/wipers_with_CAN_speed.ino](Wipers_Module/wipers_with_CAN_speed.ino) - Speed-sensitive wiper timing
+- [Coolant_Monitor_Module/CAN_INTEGRATION.md](Coolant_Monitor_Module/CAN_INTEGRATION.md) - Sensor validation via CAN
+- [AC_Display_Module/examples/ac_display_with_CAN.ino](AC_Display_Module/examples/ac_display_with_CAN.ino) - Multi-function display (NEW!)
+
 ---
 
 ## Hardware Requirements
