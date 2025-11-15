@@ -774,6 +774,114 @@ case Auto:
 
 ---
 
+## RX8 Project Ecosystem
+
+### Overview
+
+This project is part of a larger ecosystem of RX8 Arduino and reverse engineering projects. We've analyzed 14 related repositories and integrated the most valuable ones.
+
+**Full Analysis**: See `RX8_ECOSYSTEM.md` for complete integration recommendations
+
+**Related Projects**: See `docs/related_projects.md` for categorized project list
+
+### Integrated Resources
+
+#### 1. ESP8266 Companion (WiFi/Bluetooth for AC Display)
+- **Location**: `AC_Display_Module/ESP8266_Companion/`
+- **Source**: https://github.com/michaelprowacki/S1-RX8-AC-Display-ESP8266-Companion
+- **Purpose**: Adds wireless connectivity to AC Display Module
+- **Status**: Module structure created, source code obtainable from repository
+
+#### 2. CAN Bus Database (DBC File)
+- **Location**: `Documentation/rx8_can_database.dbc`
+- **Source**: https://github.com/rnd-ash/rx8-reverse-engineering
+- **Purpose**: CAN signal definitions for tool compatibility
+- **Use**: Import into SavvyCAN, Kayak, Wireshark for analysis
+
+#### 3. CAN PID Reference Documentation
+- **Location**: `Documentation/CAN_PID_Reference.md`
+- **Source**: https://github.com/topolittle/RX8-CAN-BUS + community testing
+- **Purpose**: Comprehensive reference for all RX8 CAN messages
+- **Contents**:
+  - Standard OBD-II PIDs
+  - RX8-specific CAN messages (0x201, 0x420, 0x4B0, 0x4B1, etc.)
+  - Formulas and conversions
+  - Racing telemetry configuration
+  - Implementation cross-reference
+
+### External Tool References
+
+#### ECU Backup (Recommended Before Installation)
+
+**rx8-ecu-dump** - https://github.com/ConnorRigby/rx8-ecu-dump
+- Free J2534 tool for backing up original ECU
+- ROM extraction (~2 min) and RAM snapshots (~5 sec)
+- **Strongly recommended** before installing Arduino ECU replacement
+
+#### Alternative Approaches (Tuning vs. Replacement)
+
+**ECU Tuning** (modify factory ECU software):
+- **RX8Defs**: https://github.com/Rx8Man/RX8Defs - ECUFlash/RomRaider definitions
+- **Rx8Man**: https://github.com/Rx8Man/Rx8Man - Reflashing tool
+- **GROM RomRaider**: https://github.com/equinox311/GROM_RomRaider - Tuning software
+- **Pros**: Factory reliability, proven tuning
+- **Cons**: Limited by factory hardware, expensive tools
+
+**ECU Replacement** (this project):
+- **MazdaRX8Arduino**: Replace ECU with Arduino
+- **Pros**: Full control, cheap hardware, engine swaps
+- **Cons**: Requires extensive testing, DIY risk
+
+### Related Projects by Category
+
+**CAN Bus Documentation**:
+- rx8-reverse-engineering (25 stars) - Comprehensive wiki + DBC
+- RX8-CAN-BUS - Racing telemetry PIDs
+- RX8-Dash - Instrument cluster protocol
+
+**Display Projects**:
+- Arduino OBD2 Display (12 stars) - Aftermarket OLED display
+- Coolant Monitor - Dedicated temp/pressure monitoring
+- rx8-arduino - Sim racing cluster controller
+
+**Specialized Components**:
+- rx8-wipers (7 stars) - Speed-sensitive wipers
+- All out of scope for ECU replacement
+
+**Advanced References**:
+- Mazda_RX8_PCM_ReverseEngineering - Ghidra analysis
+- See `docs/related_projects.md` for complete list
+
+### Integration Philosophy
+
+We integrate projects that:
+- ✅ Add direct value to ECU replacement use case
+- ✅ Provide authoritative reference data
+- ✅ Enable complementary features (WiFi, logging)
+- ✅ Validate our implementation
+
+We reference (don't integrate) projects that:
+- 📚 Serve different use cases (tuning, displays)
+- 📚 Are standalone tools (ECU dump, reflashing)
+- 📚 Target different components (wipers, coolant)
+
+### For AI Assistants
+
+When working on this project:
+
+1. **Cross-reference CAN messages** with `Documentation/CAN_PID_Reference.md`
+2. **Validate implementations** against `Documentation/rx8_can_database.dbc`
+3. **Consider ESP8266** integration for wireless features
+4. **Link related projects** when suggesting alternatives
+5. **Understand scope** - we replace ECU, not tune it
+
+**Key Documents**:
+- `RX8_ECOSYSTEM.md` - Full integration analysis and recommendations
+- `Documentation/CAN_PID_Reference.md` - Complete CAN protocol reference
+- `docs/related_projects.md` - Categorized project catalog
+
+---
+
 *Last Updated: 2025-11-15*
 *Repository: MazdaRX8Arduino*
 *This document is for AI assistants working on this codebase*
