@@ -41,7 +41,7 @@ This document tracks our implementation of Haltech Elite ECU features, showing w
 | CAN logging | ✅ | ✅ | Full |
 | **Advanced Features** | | | |
 | Nitrous control | ✅ | ⚠️ | Designed, not coded |
-| Water/meth injection | ✅ | ⚠️ | Designed, not coded |
+| Water/meth injection | ✅ | ✅ | **Implemented** |
 | Gear detection | ✅ | ⚠️ | Via CAN (exists in base) |
 | Rotary OMP control | ❌ | ✅ | **RX8-specific!** |
 | Apex seal monitoring | ❌ | ✅ | **RX8-specific!** |
@@ -263,16 +263,67 @@ These are features we have that Haltech doesn't specifically offer for rotaries:
 
 **Design exists**: Could implement in 2-3 hours
 
-### 2. Water/Methanol Injection (Designed, Not Coded)
+### 2. Water/Methanol Injection ✅
 
-**Haltech Feature**: Progressive water/meth injection based on boost
+**NEW - Just Implemented!**
 
-**Why not implemented**:
-- Requires additional hardware (pump, tank, nozzle)
-- Most useful for high-boost applications (>15 PSI)
-- Stock RX8 doesn't need this
+**Location**: `firmware/automotive_ecu/src/advanced/water_meth_injection.{h,cpp}`
 
-**Design exists**: Could implement in 2-3 hours
+**Features**:
+- Progressive injection based on boost (multi-stage)
+- Mixture type presets (50/50, 100% meth, 100% water, 30/70)
+- Tank level monitoring with low-level warning
+- Flow rate monitoring (detects clogged nozzles)
+- Failsafe boost limiting if injection fails
+- Pump control with gradual ramping
+- Multiple injection stages (up to 4 stages)
+- Timing advance calculation (+3-5° with injection)
+- Safe boost increase calculation (+2-3 PSI)
+- Intake temp reduction estimation (-30-50°C)
+
+**Configuration Presets**:
+- **2-Stage** (default): 5-10 PSI light, 10-15 PSI full
+- **4-Stage** (aggressive): 7-10-13-16+ PSI progressive
+
+**Benefits for Turbocharged Rotaries**:
+- Charge cooling: -40°C intake temps at high boost
+- Knock suppression: Allows +3-5° more timing
+- Safe boost increase: +2-3 PSI over dry tune
+- Reduced EGTs: Exhaust temps drop 50-100°C
+- Power gains: 5-10% from cooling + timing advance
+- Apex seal protection: Cooler combustion temps
+
+**Safety Features**:
+- Low tank level warning (cuts boost if < 5%)
+- Flow fault detection (clogged nozzle detection)
+- Failsafe boost limiting (drops to 7 PSI if system fails)
+- Gradual pump ramping (prevents pressure spikes)
+
+**Hardware Required**:
+- Water/meth pump ($80-150)
+- Nozzle(s) ($30-80 each)
+- Tank (3-5L, $40)
+- Optional: Flow sensor ($50), level sensor ($30)
+- Solenoids for staging ($40 each)
+
+**Example Usage**:
+```cpp
+// 2-stage setup for moderate boost (10-15 PSI)
+WaterMethInjection::WMIConfig cfg = WaterMethInjection::createDefault2StageConfig();
+cfg.mixture_type = WaterMethInjection::MIXTURE_50_50;
+WaterMethInjection::configure(cfg);
+WaterMethInjection::setEnabled(true);
+
+// In main loop
+uint8_t pump_duty = WaterMethInjection::update(boost, throttle, iat);
+int8_t timing_advance = WaterMethInjection::calculateTimingAdvance(boost, pump_duty);
+uint16_t safe_boost = base_boost + WaterMethInjection::calculateSafeBoostIncrease(base_boost, pump_duty);
+```
+
+**Recommended Settings**:
+- **Stock turbo (7-10 PSI)**: 2-stage, 50/50 mixture
+- **Upgraded turbo (10-15 PSI)**: 2-stage, 50/50 or 30/70 mixture
+- **Big turbo (15+ PSI)**: 4-stage, 30/70 mixture (more methanol)
 
 ### 3. Advanced Traction Control (Partial)
 
@@ -333,6 +384,7 @@ These are features we have that Haltech doesn't specifically offer for rotaries:
 | WiFi Dashboard | ESP32 ($9) | Already in UI controller |
 | OMP Control | OMP solenoid + driver | Factory RX8 part |
 | Dual Ignition | 4x ignition drivers | 2 per rotor (leading/trailing) |
+| Water/Meth Injection | Pump + nozzle(s) + tank ($150-300) | For turbo applications |
 
 ### Total Cost for Full Feature Set
 
@@ -343,10 +395,16 @@ These are features we have that Haltech doesn't specifically offer for rotaries:
   - Clutch switch: $10
   - Knock sensor: $30 (optional but recommended)
 
-- **Maximum** (turbo + all features): ~$300
+- **Turbo** (boost control): ~$300
   - Above + wastegate solenoid ($80)
   - Better knock sensor ($100)
   - Wideband O2 ($200, optional)
+
+- **Turbo + Water/Meth** (ultimate setup): ~$500
+  - Above + water/meth pump ($80-150)
+  - Nozzle(s) ($30-80 each)
+  - Tank ($40)
+  - Optional flow/level sensors ($80)
 
 **Note**: Haltech Elite 1500 ECU costs **$1,600-2,000**. We're at 5-15% of that cost!
 
@@ -366,6 +424,7 @@ These are features we have that Haltech doesn't specifically offer for rotaries:
 | **Data Logging** | 1000 Hz | 100 Hz | Haltech Better |
 | **Flex Fuel** | Yes | Yes | **Equal** |
 | **Idle Control** | Advanced | PID-based | **Equal** |
+| **Water/Meth Injection** | Yes | Yes | **Equal** |
 | **WiFi Tuning** | Yes | Yes (ESP32) | **Equal** |
 | **Map Learning** | Yes | No | Haltech Better |
 | **VVT Control** | Yes | N/A | N/A for RX8 |
