@@ -1,20 +1,60 @@
 # Mazda RX8 Arduino Electronics Repository
 
-**The comprehensive, ubiquitous RX8 Arduino electronics repository** - integrating ECU replacement, display controllers, monitoring systems, and development tools for the Mazda Mark 1 RX8.
+**The comprehensive, ubiquitous RX8 Arduino electronics repository** - from prototype Arduino modules to **production-ready unified automotive MCU firmware** for the Mazda Mark 1 RX8.
+
+---
+
+## 🚨 **NEW: Phase 5 Unified Architecture (2025-11-16)**
+
+**We've completely transformed the project from 9 separate modules to 2 unified firmwares:**
+
+### ✅ Unified Two-Tier System
+```
+┌─────────────────────────────────────────┐
+│ Tier 1: Automotive MCU                  │  ← ONE firmware, ALL critical features
+│ STM32F407 / TI C2000 / NXP S32K          │    • Engine OR motor control
+│                                          │    • CAN bus emulation
+│ ALL safety-critical features:           │    • Immobilizer bypass
+│ ✓ ICE engine control OR EV motor control│    • ABS/DSC/traction
+│ ✓ CAN bus emulation (all messages)      │    • OBD-II diagnostics
+│ ✓ Immobilizer bypass                    │    • Hardware watchdog
+│ ✓ ABS/DSC/traction control              │
+│ ✓ OBD-II diagnostics                    │
+│ ✓ Safety monitoring (watchdog)          │
+└─────────────────────────────────────────┘
+               ↕ UART/CAN
+┌─────────────────────────────────────────┐
+│ Tier 2: ESP32 ($9)                      │  ← ONE firmware, ALL UI features
+│                                          │    • AC display
+│ ALL non-critical features:              │    • OLED gauges
+│ ✓ AC display + OLED gauges + Coolant    │    • Coolant monitor
+│ ✓ Speed-sensitive wipers                │    • Wipers
+│ ✓ WiFi telemetry + Web dashboard        │    • WiFi/Bluetooth/OTA
+│ ✓ Bluetooth + OTA updates               │    • Web dashboard
+└─────────────────────────────────────────┘
+```
+
+**Benefits:**
+- 💰 **Cost:** 9 boards ($150+) → 2 boards ($24)
+- 🔧 **Simpler:** 9 codebases → 2 unified firmwares
+- 🛡️ **Safer:** Automotive-grade MCU (-40°C to 125°C, hardware watchdog)
+- 📱 **Smarter:** Built-in WiFi, OTA updates, web dashboard
+
+**→ [GET STARTED WITH UNIFIED FIRMWARE](firmware/README.md) ←**
 
 ---
 
 ## Overview
 
-This repository contains **everything you need** to replace, enhance, or control the electronics in a Mazda RX8 using Arduino-based systems. From complete ECU replacement for engine swaps to aftermarket displays, telemetry logging, and reverse engineering tools.
+This repository contains **everything you need** to replace, enhance, or control the electronics in a Mazda RX8 - from the original Arduino prototypes to production-ready automotive MCU firmware.
 
 ### What's Included
 
-- ✅ **ECU Replacement Modules** - Replace factory ECU for ICE or EV conversions
-- ✅ **Display Controllers** - Factory AC display, aftermarket OLED gauges, coolant monitors
-- ✅ **Specialized Function Modules** - Speed-sensitive wipers, sim racing cluster drivers
-- ✅ **Development Tools** - CAN protocol documentation, ECU tuning definitions, reverse engineering tools
-- ✅ **Complete Integration Guides** - How to combine modules for your specific use case
+- 🚗 **Unified Automotive Firmware** - Production-ready ECU replacement on proper automotive MCUs (NEW!)
+- 📱 **Unified UI Controller** - All displays, WiFi, wipers in one ESP32 firmware (NEW!)
+- 📚 **Legacy Modules** - Original Arduino-based modules (preserved for reference)
+- 🔧 **Development Tools** - CAN protocol documentation, ECU tuning definitions, reverse engineering tools
+- 📖 **Complete Guides** - Migration paths, integration guides, safety documentation
 
 ---
 
