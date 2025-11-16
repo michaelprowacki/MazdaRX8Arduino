@@ -22,81 +22,97 @@ This repository contains **everything you need** to replace, enhance, or control
 
 ### Choose Your Use Case
 
-#### 🔧 **Engine Swap (ICE)** → Start with [ECU_Module](ECU_Module/)
+#### 🔧 **Engine Swap (ICE)** → Start with [ECU_Module](core/ECU_Module/)
 Replace the factory ECU while maintaining dashboard, ABS, power steering, and immobilizer.
 - **Hardware**: Arduino Leonardo + MCP2515 CAN controller
+- **Features**: Optional speed-sensitive wipers (no extra hardware needed!)
 - **Status**: Production-ready, extensively tested
-- **Documentation**: [ECU_Module/README.md](ECU_Module/README.md)
+- **Documentation**: [core/ECU_Module/README.md](core/ECU_Module/README.md)
 
-#### ⚡ **Electric Vehicle Conversion** → Start with [EV_ECU_Module](EV_ECU_Module/)
+#### ⚡ **Electric Vehicle Conversion** → Start with [EV_ECU_Module](core/EV_ECU_Module/)
 Convert RX8 to electric power using Open Inverter or similar motor controllers.
 - **Hardware**: Arduino Nano + MCP2515 CAN controller
 - **Status**: Production-ready for EV conversions
-- **Documentation**: [EV_ECU_Module/README.md](EV_ECU_Module/README.md)
+- **Documentation**: [core/EV_ECU_Module/README.md](core/EV_ECU_Module/README.md)
 
-#### 📊 **Add Aftermarket Displays** → See [Aftermarket_Display_Module](Aftermarket_Display_Module/)
+#### 📊 **Add Aftermarket Displays** → See [Aftermarket_Display_Module](displays/Aftermarket_Display_Module/)
 RGB OLED displays showing 15+ engine parameters via CAN bus.
 - **Works alongside**: Any ECU module
 - **Hardware**: Arduino + MCP2515 + RGB OLED displays
-- **Documentation**: [Aftermarket_Display_Module/README.md](Aftermarket_Display_Module/README.md)
+- **Documentation**: [displays/Aftermarket_Display_Module/README.md](displays/Aftermarket_Display_Module/README.md)
 
-#### 🌡️ **Accurate Coolant Monitoring** → See [Coolant_Monitor_Module](Coolant_Monitor_Module/)
+#### 🌡️ **Accurate Coolant Monitoring** → See [Coolant_Monitor_Module](displays/Coolant_Monitor_Module/)
 The RX8's factory coolant gauge is inadequate. This module provides precise temperature and pressure monitoring.
 - **Works**: Standalone (dedicated sensors) or alongside any ECU
 - **Includes**: Firmware, PCB designs, 3D-printable enclosures
-- **Documentation**: [Coolant_Monitor_Module/README.md](Coolant_Monitor_Module/README.md)
+- **Documentation**: [displays/Coolant_Monitor_Module/README.md](displays/Coolant_Monitor_Module/README.md)
 
-#### 🎮 **Sim Racing** → See [Sim_Racing_Module](Sim_Racing_Module/)
+#### 🎮 **Sim Racing** → See [Sim_Racing_Module](specialized/Sim_Racing_Module/)
 Drive a real RX8 instrument cluster from Forza Horizon 5 or Dirt Rally 2.0.
 - **Works**: Standalone (PC-connected)
-- **Documentation**: [Sim_Racing_Module/README.md](Sim_Racing_Module/README.md)
+- **Documentation**: [specialized/Sim_Racing_Module/README.md](specialized/Sim_Racing_Module/README.md)
 
 ---
 
 ## Repository Structure
 
+**✨ NEW: Reorganized for clarity! (2025-11-16)**
+
 ```
 MazdaRX8Arduino/
 │
-├── ECU_Module/                      # Primary ECU replacement (ICE engines)
-│   ├── RX8_CANBUS.ino              # Main Arduino sketch
-│   └── README.md                    # Module documentation
+├── core/                            # ✅ Core ECU modules (safety-critical)
+│   ├── ECU_Module/                  # Primary ECU replacement (ICE engines)
+│   │   ├── RX8_CANBUS.ino          # Main Arduino sketch
+│   │   └── README.md                # Includes wipers documentation
+│   │
+│   └── EV_ECU_Module/               # Electric vehicle ECU replacement
+│       ├── rx8can_v1.4__8khz_pwm_adjusted_micros_.ino
+│       └── README.md
 │
-├── EV_ECU_Module/                   # Electric vehicle ECU replacement
-│   ├── rx8can_v1.4__8khz_pwm_adjusted_micros_.ino
-│   └── README.md
+├── displays/                        # 📺 Display modules (non-critical UI)
+│   ├── AC_Display_Module/           # Factory AC display controller
+│   │   ├── src/main.cpp             # Main code
+│   │   ├── ESP8266_Companion/       # WiFi/Bluetooth add-on
+│   │   ├── ESP32_MIGRATION.md       # Migration to ESP32 (planned)
+│   │   └── README.md
+│   │
+│   ├── Aftermarket_Display_Module/  # OBD2 OLED display (15+ parameters)
+│   │   ├── additional_display/      # Arduino sketch
+│   │   └── README.md
+│   │
+│   └── Coolant_Monitor_Module/      # Dedicated temp/pressure monitor
+│       ├── EMBEDDED/src/            # Arduino firmware
+│       ├── ELEC/                    # PCB designs (KiCad)
+│       ├── MECHA/                   # 3D models (STEP, STL)
+│       └── README.md
 │
-├── Dash_Controller_Module/          # Alternative dashboard implementation
-│   ├── main.cpp                     # PlatformIO project
-│   └── README.md                    # Reference implementation docs
+├── specialized/                     # 🎮 Specialized modules (non-automotive)
+│   ├── Sim_Racing_Module/           # Sim racing cluster driver
+│   │   ├── src/forza/forza.ino     # Forza Horizon 5 support
+│   │   ├── src/dirt/dirt.ino       # Dirt Rally 2.0 support
+│   │   └── README.md
+│   │
+│   └── Dash_Controller_Module/      # Alternative dashboard (reference)
+│       ├── main.cpp                 # PlatformIO project
+│       └── README.md
 │
-├── AC_Display_Module/               # Factory AC display controller
-│   ├── src/main.cpp                 # Main code
-│   ├── ESP8266_Companion/           # WiFi/Bluetooth add-on
-│   │   ├── src/main.cpp            # ESP8266 firmware
-│   │   └── platformio.ini          # PlatformIO config
-│   └── README.md                    # Module + ESP8266 docs
+├── archived/                        # 🗄️ Deprecated modules (kept for reference)
+│   └── Wipers_Module/               # ⚠️ DEPRECATED - Now in core/ECU_Module
+│       ├── DEPRECATED.md            # Why deprecated + migration guide
+│       ├── firmware/                # Original standalone firmware
+│       └── hardware/                # PCB designs
 │
-├── Aftermarket_Display_Module/      # OBD2 OLED display (15+ parameters)
-│   ├── additional_display/          # Arduino sketch
-│   └── README.md
+├── lib/                             # 📚 Shared libraries
+│   └── RX8_CAN_Messages/
+│       ├── RX8_CAN_Messages.h       # Shared CAN encoder/decoder
+│       └── README.md
 │
-├── Coolant_Monitor_Module/          # Dedicated temp/pressure monitor
-│   ├── EMBEDDED/src/                # Arduino firmware
-│   ├── ELEC/                        # PCB designs (KiCad)
-│   ├── MECHA/                       # 3D models (STEP, STL)
-│   └── README.md                    # Complete build guide
+├── examples/                        # 📋 Example code
+│   ├── CAN_Decoder_Example/
+│   └── OLED_Display_Example/
 │
-├── Wipers_Module/                   # Speed-sensitive wiper control
-│   └── README.md
-│
-├── Sim_Racing_Module/               # Sim racing cluster driver
-│   ├── src/forza/forza.ino         # Forza Horizon 5 support
-│   ├── src/dirt/dirt.ino           # Dirt Rally 2.0 support
-│   └── README.md
-│
-├── Tools/
-│   ├── PCM_Analysis/                # Ghidra reverse engineering
+├── tools/                           # 🔧 Development tools
 │   │   ├── Ghidra_Archives/        # ECU firmware analysis
 │   │   ├── Stock_ROMs/             # Factory ROM dumps
 │   │   └── README.md
@@ -130,7 +146,7 @@ MazdaRX8Arduino/
 
 ### For Users (Start Here)
 
-- **[Documentation/INTEGRATION_GUIDE.md](Documentation/INTEGRATION_GUIDE.md)** - How to combine modules for your specific setup
+- **[docs/INTEGRATION_GUIDE.md](docs/INTEGRATION_GUIDE.md)** - How to combine modules for your specific setup
 - **[docs/MODULE_CROSS_REFERENCE.md](docs/MODULE_CROSS_REFERENCE.md)** - Quick reference for module compatibility
 - **Individual Module READMEs** - Detailed documentation for each module
 
@@ -139,22 +155,22 @@ MazdaRX8Arduino/
 - **[lib/RX8_CAN_Messages.h](lib/RX8_CAN_Messages.h)** - Comprehensive CAN message decoder/encoder library (NEW!)
 - **[lib/README.md](lib/README.md)** - Complete library documentation with examples
 - **[examples/](examples/)** - Working examples (CAN decoder, OLED displays, etc.)
-- **[CLAUDE.md](CLAUDE.md)** - Comprehensive guide for AI assistants and developers (550+ lines)
-- **[Documentation/CAN_PID_Reference.md](Documentation/CAN_PID_Reference.md)** - Complete CAN protocol reference (600+ lines)
-- **[Documentation/rx8_can_database.dbc](Documentation/rx8_can_database.dbc)** - CAN signal definitions (import to SavvyCAN, Kayak, Wireshark)
+- **[CLAUDE.md](CLAUDE.md)** - Comprehensive guide for AI assistants and developers (1000+ lines)
+- **[docs/CAN_PID_Reference.md](docs/CAN_PID_Reference.md)** - Complete CAN protocol reference (600+ lines)
+- **[docs/rx8_can_database.dbc](docs/rx8_can_database.dbc)** - CAN signal definitions (import to SavvyCAN, Kayak, Wireshark)
 - **[RX8_ECOSYSTEM.md](RX8_ECOSYSTEM.md)** - Integration analysis for 15 related repositories
 
 ### For Researchers
 
-- **[Tools/PCM_Analysis/](Tools/PCM_Analysis/)** - Ghidra-based ECU firmware reverse engineering
-- **[Tools/ECU_Definitions/](Tools/ECU_Definitions/)** - ECUFlash/RomRaider tuning definitions
+- **[tools/PCM_Analysis/](tools/PCM_Analysis/)** - Ghidra-based ECU firmware reverse engineering
+- **[tools/ECU_Definitions/](tools/ECU_Definitions/)** - ECUFlash/RomRaider tuning definitions
 - **[docs/related_projects.md](docs/related_projects.md)** - Catalog of all related RX8 projects
 
 ---
 
 ## Key Features
 
-### ECU Replacement (ECU_Module / EV_ECU_Module)
+### ECU Replacement (core/ECU_Module / core/EV_ECU_Module)
 
 - ✅ Complete CAN bus emulation (500 kbps high-speed CAN)
 - ✅ Dashboard functionality (RPM, speed, temperature)
