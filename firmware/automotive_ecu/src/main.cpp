@@ -19,13 +19,7 @@
 #include "config/vehicle_config.h"
 
 // HAL (Hardware Abstraction Layer) - platform-specific
-#if MCU_PLATFORM == MCU_STM32F407
-    #include "hal/stm32/hal_stm32.h"
-#elif MCU_PLATFORM == MCU_TI_C2000
-    #include "hal/c2000/hal_c2000.h"
-#elif MCU_PLATFORM == MCU_NXP_S32K148
-    #include "hal/s32k/hal_s32k.h"
-#endif
+#include "hal/hal_interface.h"
 
 // Core modules - ALL included, enabled/disabled via config
 #include "core/can_controller.h"
@@ -171,7 +165,7 @@ void setup() {
 
     // Initialize ABS/DSC
     #if ENABLE_ABS_DSC
-        ABS_DSC::init();
+        ABSDSC::init();
         #if ENABLE_SERIAL_DEBUG
             Serial.println("[ABS] ABS/DSC emulation initialized");
         #endif
@@ -272,15 +266,12 @@ void loop() {
     #elif VEHICLE_TYPE == VEHICLE_TYPE_EV
         MotorControl::update(g_vehicle_state.throttle_percent,
                              g_vehicle_state.speed_kmh);
-        g_vehicle_state.rpm = MotorControl::getMotorRPM();
+        g_vehicle_state.rpm = MotorControl::getRPM();
     #endif
 
     // Update ABS/DSC
     #if ENABLE_ABS_DSC
-        ABS_DSC::update(g_vehicle_state.wheel_fl,
-                        g_vehicle_state.wheel_fr,
-                        g_vehicle_state.wheel_rl,
-                        g_vehicle_state.wheel_rr);
+        ABSDSC::update(g_vehicle_state.speed_kmh);
     #endif
 
     // Transmit CAN messages (100ms interval)
@@ -378,12 +369,7 @@ void transmitCANMessages() {
 
     // ABS/DSC messages (if enabled)
     #if ENABLE_ABS_DSC
-        uint8_t msg_620[7] = {0,0,0,0,16,0,4};
-        uint8_t msg_630[8] = {8,0,0,0,0,0,106,106};
-        uint8_t msg_650[1] = {0};
-        CANController::transmit(0x620, msg_620, 7);
-        CANController::transmit(0x630, msg_630, 8);
-        CANController::transmit(0x650, msg_650, 1);
+        ABSDSC::transmitCANMessages();
     #endif
 }
 
