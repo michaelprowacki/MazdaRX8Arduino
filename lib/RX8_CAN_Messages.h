@@ -504,6 +504,173 @@ public:
         buf[6] = (encRR >> 8) & 0xFF;
         buf[7] = encRR & 0xFF;
     }
+
+    // Encode 0x212 - DSC/ABS Status
+    static void encode0x212(uint8_t buf[], bool dscOff, bool absMIL,
+                           bool brakeFailMIL, bool etcActiveBL, bool etcDisabled) {
+        // Initialize to zeros
+        memset(buf, 0, 7);
+
+        // Encode warning bits
+        // Note: Bit positions validated from ECU_Module code
+        if(dscOff) buf[3] |= 0x04;         // Byte 3, bit 2
+        if(absMIL) buf[4] |= 0x08;         // Byte 4, bit 3
+        if(brakeFailMIL) buf[4] |= 0x40;   // Byte 4, bit 6
+        if(etcActiveBL) buf[5] |= 0x20;    // Byte 5, bit 5
+        if(etcDisabled) buf[5] |= 0x10;    // Byte 5, bit 4
+    }
+
+    // ========================================================================
+    // STATIC MESSAGE ENCODERS (for fixed PCM status messages)
+    // ========================================================================
+
+    // Encode 0x203 - Traction Control Data (typically fixed)
+    static void encode0x203(uint8_t buf[]) {
+        // Standard RX8 traction control message
+        // From ECU_Module: {19,19,19,19,175,3,19}
+        buf[0] = 19;
+        buf[1] = 19;
+        buf[2] = 19;
+        buf[3] = 19;
+        buf[4] = 175;
+        buf[5] = 3;
+        buf[6] = 19;
+    }
+
+    // Encode 0x215 - PCM Status Supplement 1 (typically fixed)
+    static void encode0x215(uint8_t buf[]) {
+        // Standard RX8 PCM supplement message
+        // From ECU_Module: {2,45,2,45,2,42,6,129}
+        buf[0] = 2;
+        buf[1] = 45;
+        buf[2] = 2;
+        buf[3] = 45;
+        buf[4] = 2;
+        buf[5] = 42;
+        buf[6] = 6;
+        buf[7] = 129;
+    }
+
+    // Encode 0x231 - PCM Status Supplement 2 (typically fixed)
+    static void encode0x231(uint8_t buf[]) {
+        // Standard RX8 PCM supplement message
+        // From ECU_Module: {15,0,255,255,0}
+        buf[0] = 15;
+        buf[1] = 0;
+        buf[2] = 255;
+        buf[3] = 255;
+        buf[4] = 0;
+    }
+
+    // Encode 0x240 - PCM Status Supplement 3 (typically fixed)
+    static void encode0x240(uint8_t buf[]) {
+        // Standard RX8 PCM supplement message
+        // From ECU_Module: {4,0,40,0,2,55,6,129}
+        buf[0] = 4;
+        buf[1] = 0;
+        buf[2] = 40;
+        buf[3] = 0;
+        buf[4] = 2;
+        buf[5] = 55;
+        buf[6] = 6;
+        buf[7] = 129;
+    }
+
+    // Encode 0x620 - ABS System Data
+    // Byte 6 (index 6) varies by vehicle: 2, 3, or 4
+    static void encode0x620(uint8_t buf[], uint8_t variant = 4) {
+        // Standard RX8 ABS data message
+        // From ECU_Module: {0,0,0,0,16,0,4}
+        buf[0] = 0;
+        buf[1] = 0;
+        buf[2] = 0;
+        buf[3] = 0;
+        buf[4] = 16;
+        buf[5] = 0;
+        buf[6] = variant;  // Vehicle-specific: 2, 3, or 4
+    }
+
+    // Encode 0x630 - ABS Configuration
+    static void encode0x630(uint8_t buf[], uint8_t transmissionType = 8,
+                           uint8_t wheelSize1 = 106, uint8_t wheelSize2 = 106) {
+        // Standard RX8 ABS config message
+        // From ECU_Module: {8,0,0,0,0,0,106,106}
+        buf[0] = transmissionType;  // 8 = typical RX8 value
+        buf[1] = 0;
+        buf[2] = 0;
+        buf[3] = 0;
+        buf[4] = 0;
+        buf[5] = 0;
+        buf[6] = wheelSize1;  // Typically 106
+        buf[7] = wheelSize2;  // Typically 106
+    }
+
+    // Encode 0x650 - ABS Supplement (single byte)
+    static void encode0x650(uint8_t buf[]) {
+        // Standard RX8 ABS supplement message
+        // From ECU_Module: {0}
+        buf[0] = 0;
+    }
+
+    // ========================================================================
+    // IMMOBILIZER RESPONSE ENCODERS
+    // ========================================================================
+
+    // Encode 0x041 - Immobilizer Response Type A
+    // Response to 0x047 with buf[1]=127, buf[2]=2
+    static void encode0x041_ResponseA(uint8_t buf[]) {
+        // From ECU_Module: {7,12,48,242,23,0,0,0}
+        buf[0] = 7;
+        buf[1] = 12;
+        buf[2] = 48;
+        buf[3] = 242;
+        buf[4] = 23;
+        buf[5] = 0;
+        buf[6] = 0;
+        buf[7] = 0;
+    }
+
+    // Encode 0x041 - Immobilizer Response Type B
+    // Response to 0x047 with buf[1]=92, buf[2]=244
+    static void encode0x041_ResponseB(uint8_t buf[]) {
+        // From ECU_Module: {129,127,0,0,0,0,0,0}
+        buf[0] = 129;
+        buf[1] = 127;
+        buf[2] = 0;
+        buf[3] = 0;
+        buf[4] = 0;
+        buf[5] = 0;
+        buf[6] = 0;
+        buf[7] = 0;
+    }
+
+    // ========================================================================
+    // CONVENIENCE FUNCTIONS
+    // ========================================================================
+
+    // Initialize all ECU messages to default values
+    // Call this once at startup to get standard RX8 ECU messages
+    static void initializeECUMessages(uint8_t send203[7], uint8_t send215[8],
+                                     uint8_t send231[5], uint8_t send240[8],
+                                     uint8_t send620[7], uint8_t send630[8],
+                                     uint8_t send650[1]) {
+        encode0x203(send203);
+        encode0x215(send215);
+        encode0x231(send231);
+        encode0x240(send240);
+        encode0x620(send620);
+        encode0x630(send630);
+        encode0x650(send650);
+    }
+
+    // Update dynamic PCM status (call this every cycle with current values)
+    static void updatePCMStatus(uint8_t send201[8], uint8_t send420[7],
+                               int rpm, int speed, int throttle,
+                               int temp, bool cel, bool lowCoolant,
+                               bool batteryCharge, bool oilPressure) {
+        encode0x201(send201, rpm, speed, throttle);
+        encode0x420(send420, temp, cel, lowCoolant, batteryCharge, oilPressure);
+    }
 };
 
 #endif // RX8_CAN_MESSAGES_H
