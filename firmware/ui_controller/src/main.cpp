@@ -210,15 +210,10 @@ void setup() {
     #endif
 
     // Initialize communication with automotive ECU
-    #if USE_UART_BRIDGE
-        UARTBridge::init(UART_BAUDRATE, UART_RX_PIN, UART_TX_PIN);
+    #if ENABLE_UART_BRIDGE
+        UARTBridge::init();
         #if ENABLE_SERIAL_DEBUG
             Serial.println("[UART] Bridge to automotive ECU initialized");
-        #endif
-    #elif USE_CAN_BRIDGE
-        CANListener::init(CAN_RX_PIN, CAN_TX_PIN, CAN_SPEED);
-        #if ENABLE_SERIAL_DEBUG
-            Serial.println("[CAN] CAN listener initialized @ 500 kbps");
         #endif
     #endif
 
@@ -316,12 +311,17 @@ void displayTask(void* param) {
 
             // Update AC display
             #if ENABLE_AC_DISPLAY
-                ACDisplay::update(state_copy);
+                ACDisplay::update();
             #endif
 
-            // Update OLED gauges
+            // Update OLED gauges (set data first)
             #if ENABLE_OLED_GAUGES
-                OLEDGauges::update(state_copy);
+                OLEDGauges::setRPM(state_copy.rpm);
+                OLEDGauges::setSpeed(state_copy.speed_kmh / 10);
+                OLEDGauges::setCoolantTemp(state_copy.coolant_temp / 10);
+                OLEDGauges::setVoltage(state_copy.battery_voltage);
+                OLEDGauges::setThrottle(state_copy.throttle_percent);
+                OLEDGauges::update();
             #endif
 
             // Update coolant monitor
@@ -383,21 +383,26 @@ void canTask(void* param) {
     TickType_t last_wake_time = xTaskGetTickCount();
 
     while (true) {
-        VehicleState new_state;
-
         // Read vehicle state from automotive ECU
-        #if USE_UART_BRIDGE
-            if (UARTBridge::receiveVehicleState(&new_state)) {
+        #if ENABLE_UART_BRIDGE
+            UARTBridge::update();
+
+            if (UARTBridge::isValid()) {
+                const UARTBridge::VehicleState* new_state = UARTBridge::getVehicleState();
+
                 // Update global state (thread-safe)
                 if (xSemaphoreTake(g_state_mutex, portMAX_DELAY)) {
-                    g_vehicle_state = new_state;
-                    xSemaphoreGive(g_state_mutex);
-                }
-            }
-        #elif USE_CAN_BRIDGE
-            if (CANListener::receiveVehicleState(&new_state)) {
-                if (xSemaphoreTake(g_state_mutex, portMAX_DELAY)) {
-                    g_vehicle_state = new_state;
+                    // Copy UART state to global state
+                    g_vehicle_state.rpm = new_state->rpm;
+                    g_vehicle_state.speed_kmh = new_state->speed_kmh;
+                    g_vehicle_state.throttle_percent = new_state->throttle_percent;
+                    g_vehicle_state.coolant_temp = new_state->coolant_temp;
+                    g_vehicle_state.battery_voltage = new_state->battery_voltage;
+                    g_vehicle_state.wheel_fl = new_state->wheel_fl;
+                    g_vehicle_state.wheel_fr = new_state->wheel_fr;
+                    g_vehicle_state.wheel_rl = new_state->wheel_rl;
+                    g_vehicle_state.wheel_rr = new_state->wheel_rr;
+
                     xSemaphoreGive(g_state_mutex);
                 }
             }
