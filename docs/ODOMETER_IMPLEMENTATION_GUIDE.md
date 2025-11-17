@@ -52,23 +52,24 @@ send420[1] = 0;        // Byte 1: Odometer - STATIC (no change)
 
 ### Key Insight: Byte 1 Behavior
 
-**Discovery** (from Chamber blog & our testing):
+**Discovery** (from Chamber blog Part 6 & Part 21):
 - Cluster **counts byte 1 increments**, NOT absolute value
-- Each increment = **0.1 mile** (160 meters)
+- **4,140 increments per mile displayed** (confirmed by David Blackhurst)
+- Each increment = **1/4,140 mile = 1.28 feet** (0.00024 miles)
 - Byte wraps around (255 → 0) automatically
 - Cluster maintains internal odometer total
 
 **Example**:
 ```
 Initial cluster odometer: 100,000.0 miles
-Send: send420[1] = 5
-Cluster increments by 5 * 0.1 = 0.5 miles
-New cluster odometer: 100,000.5 miles
+Drive 1 mile at constant speed
+send420[1] increments 4,140 times
+New cluster odometer: 100,001.0 miles
 
-Next time:
-Send: send420[1] = 6  (incremented by 1)
-Cluster increments by 1 * 0.1 = 0.1 miles
-New cluster odometer: 100,000.6 miles
+At 60 mph:
+4,140 increments/mile × 60 miles/hour = 248,400 increments/hour
+= 69 increments/second
+= One increment every ~14.5 milliseconds
 ```
 
 **Important**: We only need to increment the byte, NOT calculate absolute mileage.
@@ -79,24 +80,35 @@ New cluster odometer: 100,000.6 miles
 
 ### Speed to Odometer Interval
 
-**Goal**: Increment `send420[1]` by 1 every time the vehicle travels 0.1 mile.
+**Goal**: Increment `send420[1]` by 1 every 1/4,140 mile traveled.
 
-**Formula**:
+**Formula** (from Chamber Part 6):
 ```
-Distance per increment = 0.1 mile
-Time to travel 0.1 mile at V mph = (0.1 / V) hours = (0.1 / V) * 60 minutes = (6 / V) minutes
-Convert to microseconds: (6 / V) * 60 * 1,000,000 = (360,000,000 / V) microseconds
+Increments needed per mile = 4,140
+Distance per increment = 1/4,140 mile
 
-interval_microseconds = 360,000,000 / vehicleSpeed
+At speed V mph:
+Time to travel 1/4,140 mile = (1/4,140) / V hours
+Convert to microseconds: (1/4,140) / V × 60 × 60 × 1,000,000
+                       = 3,600,000,000 / (V × 4,140)
+                       = 869,565 / V microseconds (rounded)
+
+Simplified formula:
+interval_microseconds = 869,565 / vehicleSpeed
+```
+
+**Accurate Constant** (for precision):
+```cpp
+#define ODOMETER_INTERVAL_CONSTANT 869565UL  // = 3,600,000,000 / 4,140
 ```
 
 **Examples**:
-| Speed (mph) | Time per 0.1 mile | Microseconds | Increment Frequency |
+| Speed (mph) | Time per increment | Microseconds | Increment Frequency |
 |-------------|-------------------|--------------|---------------------|
-| 60 | 6 seconds | 6,000,000 μs | Every 6 seconds |
-| 30 | 12 seconds | 12,000,000 μs | Every 12 seconds |
-| 10 | 36 seconds | 36,000,000 μs | Every 36 seconds |
-| 1 | 360 seconds (6 min) | 360,000,000 μs | Every 6 minutes |
+| 60 | 14.49 milliseconds | 14,493 μs | ~69 per second |
+| 30 | 28.99 milliseconds | 28,986 μs | ~35 per second |
+| 10 | 86.96 milliseconds | 86,956 μs | ~11 per second |
+| 1 | 869.57 milliseconds | 869,565 μs | ~1 per second |
 
 ---
 
@@ -128,16 +140,18 @@ static byte odometerByte = 0;                  // Current odometer increment byt
 /**
  * Update odometer increment based on vehicle speed
  * Called every loop cycle (~100ms)
- * Increments send420[1] every 0.1 mile traveled
+ * Increments send420[1] every 1/4,140 mile traveled (4,140 increments per mile)
  *
- * Formula: 0.1 mile at V mph = (360,000,000 / V) microseconds
+ * Formula: 1/4,140 mile at V mph = (869,565 / V) microseconds
+ * Source: Chamber of Understanding Part 6 (David Blackhurst)
  */
 void updateOdometer() {
     // Only increment if vehicle is moving
     if (vehicleSpeed > 0) {
-        // Calculate microseconds per 0.1 mile at current speed
+        // Calculate microseconds per increment at current speed
+        // 869,565 = 3,600,000,000 / 4,140 (4,140 increments per mile)
         // UL = unsigned long literal (prevents integer overflow)
-        unsigned long interval = 360000000UL / vehicleSpeed;
+        unsigned long interval = 869565UL / vehicleSpeed;
 
         // Check if enough time has passed since last increment
         if (micros() - lastOdometerUpdate >= interval) {
@@ -248,9 +262,12 @@ vehicleSpeed = 60;  // Force 60 mph
 ```
 
 **Expected Result**:
-- Odometer increments every **6 seconds**
+- Odometer increments every **~14.5 milliseconds** (869,565 / 60 = 14,493 μs)
 - Serial output: `Odometer incremented: 1 (Speed: 60 mph)`
-- After 60 seconds: `odometerByte` = 10 (10 * 0.1 mile = 1 mile traveled)
+- After 1 second: `odometerByte` ≈ 69 (69 increments/second at 60 mph)
+- After 60 seconds: `odometerByte` ≈ 4,140 (wraps ~16 times, 1 mile traveled)
+
+**Note**: Byte wraps at 255, so you'll see: 0→255→0→255... (16 full cycles = 4,096 increments)
 
 #### Test 2: Simulate 30 mph
 ```cpp
@@ -258,8 +275,9 @@ vehicleSpeed = 30;  // Force 30 mph
 ```
 
 **Expected Result**:
-- Odometer increments every **12 seconds**
-- After 60 seconds: `odometerByte` = 5 (5 * 0.1 mile = 0.5 miles)
+- Odometer increments every **~29 milliseconds** (869,565 / 30 = 28,986 μs)
+- After 1 second: `odometerByte` ≈ 35 (35 increments/second at 30 mph)
+- After 60 seconds: `odometerByte` ≈ 2,070 (wraps ~8 times, 0.5 miles traveled)
 
 #### Test 3: Simulate Stop/Start
 ```cpp

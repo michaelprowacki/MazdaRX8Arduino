@@ -96,6 +96,10 @@ int frontRight;
 int rearLeft;
 int rearRight;
 
+// Variables for Odometer (4,140 increments per mile - Chamber Part 6)
+unsigned long lastOdometerUpdate = 0;  // Last time odometer was incremented (microseconds)
+byte odometerByte = 0;                  // Current odometer increment byte (0-255, wraps around)
+
 #ifdef ENABLE_WIPERS
 // Variables for Speed-Sensitive Wipers
 int wiperDelay = 2000;           // Default 2 seconds between wipes
@@ -174,6 +178,10 @@ void setDefaults() {
   batChargeMIL    = 0;
   oilPressureMIL  = 0;
 
+  // Odometer timing (4,140 increments per mile - Chamber Part 6)
+  odometerByte = 0;
+  lastOdometerUpdate = micros();  // Initialize to current time
+
   // StatusPCM
   engineRPM       = 1000;   // RPM
   vehicleSpeed    = 0;      // MPH
@@ -221,11 +229,49 @@ void updateMIL() {
   // Use shared library encoder - much cleaner than manual bit manipulation!
   RX8_CAN_Encoder::encode0x420(send420, engTemp, checkEngineMIL, lowWaterMIL,
                                 batChargeMIL, oilPressureMIL);
+  // Update odometer byte (set by updateOdometer() function)
+  send420[1] = odo;
 }
 
 void updatePCM() {
   // Use shared library encoder - handles RPM*3.85 and speed encoding automatically
   RX8_CAN_Encoder::encode0x201(send201, engineRPM, vehicleSpeed, throttlePedal);
+}
+
+/*
+ * Update odometer increment based on vehicle speed
+ * Implements accurate odometer tracking: 4,140 increments per mile
+ * Source: Chamber of Understanding Part 6 (David Blackhurst)
+ *
+ * Called every 100ms cycle in sendOnTenth()
+ * Increments send420[1] based on actual distance traveled
+ *
+ * Formula: 1/4,140 mile at V mph = (869,565 / V) microseconds per increment
+ * Where: 869,565 = 3,600,000,000 / 4,140
+ */
+void updateOdometer() {
+  // Only increment if vehicle is moving
+  if (vehicleSpeed > 0) {
+    // Calculate microseconds per increment at current speed
+    // 869,565 = 3,600,000,000 / 4,140 (4,140 increments per mile)
+    // UL = unsigned long literal (prevents integer overflow)
+    unsigned long interval = 869565UL / vehicleSpeed;
+
+    // Check if enough time has passed since last increment
+    if (micros() - lastOdometerUpdate >= interval) {
+      // Increment odometer byte (wraps automatically at 255 → 0)
+      odometerByte++;
+
+      // Update CAN message byte 1 (odometer is sent in send420 via updateMIL)
+      odo = odometerByte;
+
+      // Record this update time
+      lastOdometerUpdate = micros();
+    }
+  } else {
+    // Vehicle stopped - no increment, but update timer to prevent overflow issues
+    lastOdometerUpdate = micros();
+  }
 }
 
 void updateDSC() {
@@ -243,13 +289,14 @@ void sendOnTenth() {
   CAN0.sendMsgBuf(0x620, 0, 7, send620);
   CAN0.sendMsgBuf(0x630, 0, 8, send630);
   CAN0.sendMsgBuf(0x650, 0, 1, send650);
-  
+
+  updateOdometer();  // Update odometer based on vehicle speed (4,140 increments/mile)
   updateMIL();
   CAN0.sendMsgBuf(0x420, 0, 7, send420);
 
   updatePCM();
   CAN0.sendMsgBuf(0x201, 0, 8, send201);
-  
+
   /* Add this section back in if you want to take control of ABS / DSC Lights.
   updateDSC();
   CAN0.sendMsgBuf(0x212, 0, 7, send212);

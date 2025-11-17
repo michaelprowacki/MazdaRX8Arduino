@@ -32,11 +32,12 @@
 - **Advanced Lighting**: Headlight control, turn signals (via CAN)
 
 ### Recent Breakthroughs
-✅ **Chamber of Understanding** blog (Parts 5 & 21) provided working code with:
+✅ **Chamber of Understanding** blog (Parts 5, 6, & 21) provided working code with:
 - Immobilizer handshake stored in EEPROM
-- Odometer increment logic (microsecond calculation)
+- **Odometer increment logic**: **4,140 value changes per mile displayed** (Part 6)
 - Megasquirt ECU integration (0x5F0, 0x5F2, 0x5F3)
 - Bitwise operations for warning lights
+- Message timing requirements (Part 6): 0x201 (~1453ms), 0x420 (~109ms), 0x620 (~102ms)
 
 ---
 
