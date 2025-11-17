@@ -2,6 +2,8 @@
 
 Electronic power distribution system for RX8 engine swaps and EV conversions.
 
+**IMPORTANT**: This is V1 (proof-of-concept). See PDM_V2_COMPACT_DESIGN.md for proper compact design with true electronic circuit breakers.
+
 ## Features
 
 **Engine Swap**: Fuel pump, progressive fans (50-70-100%), water pump, A/C, lights
@@ -20,6 +22,8 @@ Electronic power distribution system for RX8 engine swaps and EV conversions.
 - Enclosure, wire, connectors ($55)
 
 **Total**: $230 (vs $1,200-5,500 commercial PDMs)
+
+**Limitations**: V1 still requires inline fuses (not truly fuse-less), bulky (8" x 6"), no auto-retry circuit breakers. See PDM_V2_COMPACT_DESIGN.md for proper compact design ($177-227, 4" x 6", true electronic circuit breakers, no fuses).
 
 ## Quick Start
 
