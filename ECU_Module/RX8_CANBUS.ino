@@ -44,6 +44,10 @@
 // Uncomment to enable speed-sensitive wipers
 // #define ENABLE_WIPERS
 
+// Uncomment to enable rusEFI CAN gateway mode
+// When enabled, reads engine data from rusEFI and translates to RX8 dashboard format
+#define ENABLE_RUSEFI_GATEWAY
+
 // ========== PIN DEFINITIONS ==========
 #define CANint 2
 #define LED2 8
@@ -107,6 +111,38 @@ unsigned long lastWipe = 0;      // Timestamp of last wiper activation
 bool wiperEnabled = true;        // Master enable for wiper control
 #endif
 
+#ifdef ENABLE_RUSEFI_GATEWAY
+// rusEFI CAN Message IDs (configure these in TunerStudio to match)
+#define RUSEFI_ENGINE_DATA    0x100  // RPM, CLT, TPS
+#define RUSEFI_SENSORS        0x101  // MAP, IAT, Battery
+#define RUSEFI_AFR_DATA       0x102  // AFR, Fuel Pressure, Oil Pressure
+#define RUSEFI_TIMING_DATA    0x103  // Knock retard, Timing advance
+#define RUSEFI_BOOST_DATA     0x104  // Boost pressure, Target boost
+
+// rusEFI data variables
+float rusEFI_AFR = 14.7;
+float rusEFI_MAP = 100.0;         // kPa
+float rusEFI_IAT = 25.0;          // Celsius
+float rusEFI_BatteryVoltage = 12.0;
+float rusEFI_FuelPressure = 300.0; // kPa
+float rusEFI_OilPressure = 300.0;  // kPa
+float rusEFI_KnockRetard = 0.0;    // degrees
+float rusEFI_TimingAdvance = 0.0;  // degrees
+float rusEFI_BoostPressure = 0.0;  // kPa above atmospheric
+float rusEFI_TargetBoost = 0.0;    // kPa
+
+// Safety thresholds
+#define LEAN_AFR_WARNING 16.0       // Warn if AFR > 16 under load
+#define HIGH_KNOCK_WARNING 5.0      // Warn if knock retard > 5 degrees
+#define LOW_OIL_PRESSURE 100.0      // kPa (~15 psi)
+#define LOW_BATTERY_VOLTAGE 11.5    // Volts
+
+// Gateway status
+bool rusEFI_Connected = false;
+unsigned long lastRusEFIMessage = 0;
+#define RUSEFI_TIMEOUT 1000  // ms - consider disconnected if no messages
+#endif
+
 //Variables for reading in from the CANBUS
 unsigned char len = 0;
 unsigned char buf[8];
@@ -151,6 +187,11 @@ void setup() {
   digitalWrite(WIPER_CONTROL_PIN, LOW);  // Ensure wipers are off initially
   pinMode(WIPER_SENSE_PIN, INPUT);
   Serial.println("Speed-Sensitive Wipers: ENABLED");
+#endif
+
+#ifdef ENABLE_RUSEFI_GATEWAY
+  Serial.println("rusEFI Gateway: ENABLED");
+  Serial.println("Listening for rusEFI CAN on 0x100-0x104");
 #endif
 
   if (CAN0.begin(CAN_500KBPS) == CAN_OK) {
@@ -361,11 +402,118 @@ void controlWipers() {
 }
 #endif
 
+#ifdef ENABLE_RUSEFI_GATEWAY
+/*
+ * Process CAN messages from rusEFI and translate to RX8 dashboard format
+ * rusEFI sends engine data via configurable CAN broadcast
+ * We translate this to the RX8's native CAN protocol
+ */
+void processRusEFIGateway(unsigned long canID, unsigned char* data) {
+  switch (canID) {
+    case RUSEFI_ENGINE_DATA:  // 0x100
+      // Byte 0-1: RPM (16-bit, 0.25 RPM resolution in rusEFI)
+      engineRPM = ((data[0] << 8) | data[1]) / 4;
+
+      // Byte 2: Coolant temp (offset -40°C, so 0=−40°C, 145=105°C)
+      engTemp = data[2];
+
+      // Byte 3: TPS (0-100%)
+      throttlePedal = data[3];
+
+      // Mark as connected
+      rusEFI_Connected = true;
+      lastRusEFIMessage = millis();
+      break;
+
+    case RUSEFI_SENSORS:  // 0x101
+      // Byte 0-1: MAP (16-bit, 0.1 kPa resolution)
+      rusEFI_MAP = ((data[0] << 8) | data[1]) / 10.0;
+
+      // Byte 2: IAT (offset -40°C)
+      rusEFI_IAT = data[2] - 40.0;
+
+      // Byte 3-4: Battery voltage (0.01V resolution)
+      rusEFI_BatteryVoltage = ((data[3] << 8) | data[4]) / 100.0;
+
+      // Check battery voltage warning
+      if (rusEFI_BatteryVoltage < LOW_BATTERY_VOLTAGE) {
+        batChargeMIL = 1;
+      } else {
+        batChargeMIL = 0;
+      }
+      break;
+
+    case RUSEFI_AFR_DATA:  // 0x102
+      // Byte 0-1: AFR (0.001 resolution)
+      rusEFI_AFR = ((data[0] << 8) | data[1]) / 1000.0;
+
+      // Byte 2-3: Fuel pressure (0.1 kPa resolution)
+      rusEFI_FuelPressure = ((data[2] << 8) | data[3]) / 10.0;
+
+      // Byte 4-5: Oil pressure (0.1 kPa resolution)
+      rusEFI_OilPressure = ((data[4] << 8) | data[5]) / 10.0;
+
+      // Check for lean condition under load (dangerous)
+      if (rusEFI_AFR > LEAN_AFR_WARNING && throttlePedal > 50) {
+        checkEngineMIL = 1;  // Warn driver immediately
+      }
+
+      // Check oil pressure
+      if (rusEFI_OilPressure < LOW_OIL_PRESSURE && engineRPM > 1000) {
+        oilPressureMIL = 1;
+        oilPressure = 0;  // Bad oil pressure
+      } else {
+        oilPressureMIL = 0;
+        oilPressure = 1;  // Good oil pressure
+      }
+      break;
+
+    case RUSEFI_TIMING_DATA:  // 0x103
+      // Byte 0: Knock retard (0.5 degree resolution)
+      rusEFI_KnockRetard = data[0] / 2.0;
+
+      // Byte 1-2: Timing advance (0.1 degree resolution, signed)
+      int16_t rawTiming = (data[1] << 8) | data[2];
+      rusEFI_TimingAdvance = rawTiming / 10.0;
+
+      // Check for significant knock (warn driver)
+      if (rusEFI_KnockRetard > HIGH_KNOCK_WARNING) {
+        checkEngineMIL = 1;
+      }
+      break;
+
+    case RUSEFI_BOOST_DATA:  // 0x104
+      // Byte 0-1: Boost pressure (0.1 kPa resolution)
+      rusEFI_BoostPressure = ((data[0] << 8) | data[1]) / 10.0;
+
+      // Byte 2-3: Target boost (0.1 kPa resolution)
+      rusEFI_TargetBoost = ((data[2] << 8) | data[3]) / 10.0;
+      break;
+  }
+}
+
+/*
+ * Check rusEFI connection status
+ * If no messages received for RUSEFI_TIMEOUT ms, consider disconnected
+ */
+void checkRusEFIConnection() {
+  if (rusEFI_Connected && (millis() - lastRusEFIMessage > RUSEFI_TIMEOUT)) {
+    rusEFI_Connected = false;
+    checkEngineMIL = 1;  // Warn driver - lost ECU communication
+    Serial.println("WARNING: Lost rusEFI connection!");
+  }
+}
+#endif
+
 void loop() {
   //Send information on the CanBud every 100ms to avoid spamming the system.
   if(millis() - lastRefreshTime >= 100) {
 		lastRefreshTime += 100;
     sendOnTenth();
+
+#ifdef ENABLE_RUSEFI_GATEWAY
+    checkRusEFIConnection();
+#endif
 	}
 
 #ifdef ENABLE_WIPERS
@@ -376,13 +524,20 @@ void loop() {
   //Read the CAN and Respond if necessary or use data
   if(CAN_MSGAVAIL == CAN0.checkReceive()) { // Check to see whether data is read
     CAN0.readMsgBufID(&ID, &len, buf);    // Read data
-    
+
+#ifdef ENABLE_RUSEFI_GATEWAY
+    // Process rusEFI CAN messages (0x100-0x104)
+    if (ID >= 0x100 && ID <= 0x104) {
+      processRusEFIGateway(ID, buf);
+    }
+#endif
+
     if(ID == 530) {
       for(int i = 0; i<len; i++) { // Output 8 Bytes of data in Dec
         Serial.print(buf[i]);
         Serial.print("\t");
       }
-      
+
   //    Serial.print(time); // Timestamp
       Serial.println("");
   //    Serial.println(line); // Line Number
