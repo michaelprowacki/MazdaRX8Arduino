@@ -31,7 +31,7 @@ This repository has undergone consolidation to reduce hardware complexity and co
 
 **How to enable**:
 ```cpp
-// In ECU_Module/RX8_CANBUS.ino line 37:
+// In core/ECU_Module/RX8_CANBUS.ino line 37:
 #define ENABLE_WIPERS  // Uncomment to enable speed-sensitive wipers
 ```
 
@@ -46,7 +46,7 @@ This repository has undergone consolidation to reduce hardware complexity and co
   - Simpler wiring
 
 **Migration Status**: Planning phase
-**Documentation**: See `AC_Display_Module/ESP32_MIGRATION.md`
+**Documentation**: See `displays/AC_Display_Module/ESP32_MIGRATION.md`
 
 ### Module Count Reduction
 - **Before consolidation**: 9 modules
@@ -128,13 +128,25 @@ void updateMIL() {
 }
 ```
 
+#### 6. Repository Structural Reorganization (2025-11-16)
+- **Before**: All modules at root level, deprecated code mixed with active code
+- **After**: Organized into `core/`, `displays/`, `specialized/`, `archived/`
+- **Benefits**:
+  - Clear separation of safety-critical vs non-critical code
+  - Easy to identify active vs deprecated modules
+  - Improved navigation and maintainability
+  - Archived code preserved for reference
+- **Documentation**: See `STRUCTURE.md` for complete rationale
+- **Impact**: No code changes, only folder reorganization (git history preserved)
+
 ### Project Evolution Summary
 
 | Phase | Focus | Grade | Key Metric |
 |-------|-------|-------|------------|
 | **Phase 1** | Hardware consolidation | B+ (85%) | 9 → 7 modules |
 | **Phase 2** | Code quality (ICE ECU) | A- (90%) | 40% → 80% reuse |
-| **Phase 3** | Safety + EV refactoring | **A+ (95%)** | **95% reuse + safety path** |
+| **Phase 3** | Safety + EV refactoring | A+ (95%) | 95% reuse + safety path |
+| **Phase 4** | Structural organization | **A+ (96%)** | **Clear hierarchy + archived modules** |
 
 **To reach 100%**: Implement actual STM32/C2000 migration (estimated 2-4 weeks)
 
@@ -142,37 +154,90 @@ void updateMIL() {
 
 ## Repository Structure
 
+**✨ UPDATED 2025-11-16**: Repository reorganized for clarity!
+
 ```
 MazdaRX8Arduino/
-├── RX8_CANBUS.ino              # Main Arduino sketch (PRIMARY ECU CODE FILE)
-├── README.md                    # Project introduction and donation info
-├── CLAUDE.md                    # This file - AI assistant guide
 │
-├── AC_Display_Module/          # AC Display Controller (NEW MODULE)
-│   ├── README.md               # AC module documentation
-│   ├── platformio.ini          # PlatformIO configuration
-│   ├── src/                    # Source files
-│   │   ├── main.cpp           # Main AC display code
-│   │   └── main.hpp           # Main header file
-│   ├── include/               # Header files
-│   │   ├── pins.h             # Pin definitions
-│   │   └── data_types.h       # Common data structures
-│   ├── lib/                   # Custom libraries (see lib/README.md)
-│   │   └── README.md          # Library documentation
-│   └── docs/                  # Additional documentation
-│       └── integration.md     # Integration guide
+├── core/                        # ✅ Core ECU modules (safety-critical)
+│   ├── ECU_Module/              # Primary ECU replacement (ICE engines)
+│   │   ├── RX8_CANBUS.ino      # Main Arduino sketch (PRIMARY ECU CODE FILE)
+│   │   └── README.md            # ECU documentation (includes wipers)
+│   │
+│   └── EV_ECU_Module/           # Electric vehicle ECU replacement
+│       ├── rx8can_v1.4__8khz_pwm_adjusted_micros_.ino
+│       └── README.md
 │
-├── Documentation/
-│   ├── 08_Steering.pdf         # Steering system documentation
-│   ├── 13Electrical.pdf        # Electrical system documentation
-│   ├── Engine-Manual.pdf       # Engine manual
-│   ├── RX8 CanBus and Throttle Explained.pdf  # CAN Bus technical details
-│   └── control system.jpg      # Control system diagram
+├── displays/                    # 📺 Display modules (non-critical UI)
+│   ├── AC_Display_Module/       # Factory AC display controller
+│   │   ├── src/main.cpp         # Main AC display code
+│   │   ├── include/             # Header files (pins.h, data_types.h)
+│   │   ├── lib/                 # Custom libraries
+│   │   ├── ESP8266_Companion/   # WiFi/Bluetooth add-on
+│   │   ├── ESP32_MIGRATION.md   # Migration to ESP32 (planned)
+│   │   └── README.md
+│   │
+│   ├── Aftermarket_Display_Module/  # OBD2 OLED displays
+│   │   └── README.md
+│   │
+│   └── Coolant_Monitor_Module/  # Dedicated temp/pressure monitor
+│       ├── EMBEDDED/src/        # Arduino firmware
+│       ├── ELEC/                # PCB designs
+│       ├── MECHA/               # 3D models
+│       └── README.md
 │
-└── Data Files/
-    ├── CanBus Raw Output.xlsx  # Raw CAN Bus data capture
-    └── RX8CanBus20-05-2020.xlsx # Processed CAN Bus data
+├── specialized/                 # 🎮 Specialized modules
+│   ├── Sim_Racing_Module/       # Sim racing cluster driver
+│   └── Dash_Controller_Module/  # Alternative dashboard (reference)
+│
+├── archived/                    # 🗄️ Deprecated modules
+│   └── Wipers_Module/           # ⚠️ DEPRECATED - Now in core/ECU_Module
+│       ├── DEPRECATED.md        # Migration guide
+│       ├── firmware/            # Original standalone firmware
+│       └── hardware/            # PCB designs
+│
+├── lib/                         # 📚 Shared libraries
+│   └── RX8_CAN_Messages/
+│       ├── RX8_CAN_Messages.h   # Shared CAN encoder/decoder
+│       └── README.md
+│
+├── examples/                    # 📋 Example code
+│   ├── CAN_Decoder_Example/
+│   └── OLED_Display_Example/
+│
+├── tools/                       # 🔧 Development tools (renamed from Tools/)
+│   ├── PCM_Analysis/            # Ghidra ECU reverse engineering
+│   └── ECU_Definitions/         # ECUFlash/RomRaider tuning defs
+│
+├── docs/                        # 📖 Documentation
+│   ├── CAN_PID_Reference.md     # Complete CAN protocol reference
+│   ├── rx8_can_database.dbc     # CAN signal definitions
+│   ├── related_projects.md      # RX8 ecosystem catalog
+│   └── PDFs/                    # Factory service manuals
+│       ├── 08_Steering.pdf
+│       ├── 13Electrical.pdf
+│       ├── Engine-Manual.pdf
+│       └── RX8 CanBus and Throttle Explained.pdf
+│
+├── CLAUDE.md                    # 🤖 This file - AI assistant guide
+├── STRUCTURE.md                 # 📂 Repository organization guide
+├── README.md                    # 👋 Project introduction
+├── CONSOLIDATION_SUMMARY.md     # 📊 Phase 1 consolidation details
+├── PHASE2_CODE_QUALITY.md       # 📊 Phase 2 code quality improvements
+├── PHASE3_ARCHITECTURAL_UPGRADE.md  # 📊 Phase 3 safety architecture
+├── AUTOMOTIVE_MCU_MIGRATION.md  # 🚗 Future automotive MCU migration
+├── RX8_ECOSYSTEM.md             # 🌐 Related projects integration
+└── CREDITS.md                   # 👏 Attribution and thanks
 ```
+
+**Key Changes**:
+- ✅ **Core modules** (`core/`) - Safety-critical ECU code separated
+- ✅ **Display modules** (`displays/`) - Non-critical UI code grouped
+- ✅ **Archived modules** (`archived/`) - Deprecated code kept for reference
+- ✅ **Lowercase tools** (`tools/`) - Consistency with other directories
+- ✅ **Wipers integrated** - Now optional feature in ECU_Module (see line 37 of RX8_CANBUS.ino)
+
+See `STRUCTURE.md` for detailed rationale.
 
 ---
 
