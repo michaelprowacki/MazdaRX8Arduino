@@ -45,7 +45,7 @@ void XcpSlave::processCommand(uint8_t* data, uint8_t length) {
 
     // All other commands require connection
     if (!m_connected) {
-        sendError(XCP_ERR_CMD_SEQUENCE);
+        sendError(XCP_ERR_SEQUENCE);
         return;
     }
 
