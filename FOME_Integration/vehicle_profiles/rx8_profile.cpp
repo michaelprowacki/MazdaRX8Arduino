@@ -233,10 +233,15 @@ private:
 
 // Platform-specific CAN transmit implementation
 // This needs to be linked with FOME's CAN driver
-extern "C" void fomeCan Transmit(uint32_t id, uint8_t* data, uint8_t length);
+extern "C" void fomeCanTransmit(uint32_t id, uint8_t* data, uint8_t length);
 
 void RX8Profile::canTransmit(uint32_t id, uint8_t* data, uint8_t length) {
     fomeCanTransmit(id, data, length);
+}
+
+// Factory helper for creating RX8 profile
+VehicleProfile* createRX8Profile() {
+    return new RX8Profile();
 }
 
 // Factory function
