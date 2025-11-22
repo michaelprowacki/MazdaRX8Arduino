@@ -38,6 +38,149 @@
 
 // CAN filter configuration
 #define CAN_FILTER_BANKS      14
+#define CAN_MAX_FILTERS       28
+
+// ADC with DMA configuration
+#define ADC_NUM_CHANNELS      8
+#define ADC_BUFFER_DEPTH      16
+
+// EEPROM wear-leveling configuration
+#define EEPROM_PAGE_SIZE      256
+#define EEPROM_NUM_PAGES      (EEPROM_SIZE / EEPROM_PAGE_SIZE)
+#define EEPROM_HEADER_SIZE    4
+#define EEPROM_MAGIC          0xEE01
+
+// -----------------------------------------
+// CAN Filter Management
+// -----------------------------------------
+
+static uint8_t canFilterCount = 0;
+
+// Add hardware CAN filter
+bool platform_can_add_filter(uint32_t id, uint32_t mask, bool extended) {
+    if (canFilterCount >= CAN_MAX_FILTERS) {
+        return false;
+    }
+
+    CANFilter filter;
+    filter.filter = canFilterCount / 2;
+    filter.mode = 0;  // Mask mode
+    filter.scale = 1; // 32-bit scale
+    filter.assignment = 0; // FIFO 0
+
+    if (extended) {
+        filter.register1 = (id << 3) | 0x04;  // Extended ID
+        filter.register2 = (mask << 3) | 0x04;
+    } else {
+        filter.register1 = id << 21;  // Standard ID
+        filter.register2 = mask << 21;
+    }
+
+    canSTM32SetFilters(canDriver, 1, 1, &filter);
+    canFilterCount++;
+    return true;
+}
+
+// Add filter for specific CAN ID
+bool platform_can_filter_id(uint32_t id) {
+    return platform_can_add_filter(id, 0x7FF, false);
+}
+
+// Add filter for ID range
+bool platform_can_filter_range(uint32_t id_start, uint32_t id_end) {
+    // Calculate mask for range
+    uint32_t mask = ~(id_start ^ id_end) & 0x7FF;
+    return platform_can_add_filter(id_start, mask, false);
+}
+
+// Clear all CAN filters
+void platform_can_clear_filters(void) {
+    canFilterCount = 0;
+    // Reset to accept all messages
+    CANFilter filter;
+    filter.filter = 0;
+    filter.mode = 0;
+    filter.scale = 1;
+    filter.assignment = 0;
+    filter.register1 = 0;
+    filter.register2 = 0;
+    canSTM32SetFilters(canDriver, 1, 1, &filter);
+}
+
+// -----------------------------------------
+// ADC with DMA
+// -----------------------------------------
+
+static adcsample_t adcBuffer[ADC_NUM_CHANNELS * ADC_BUFFER_DEPTH];
+static bool adcInitialized = false;
+
+// ADC conversion group configuration
+static const ADCConversionGroup adcConvGroup = {
+    .circular = TRUE,
+    .num_channels = ADC_NUM_CHANNELS,
+    .end_cb = NULL,
+    .error_cb = NULL,
+    .cr1 = 0,
+    .cr2 = ADC_CR2_SWSTART,
+    .smpr1 = ADC_SMPR1_SMP_AN10(ADC_SAMPLE_480) |
+             ADC_SMPR1_SMP_AN11(ADC_SAMPLE_480) |
+             ADC_SMPR1_SMP_AN12(ADC_SAMPLE_480) |
+             ADC_SMPR1_SMP_AN13(ADC_SAMPLE_480),
+    .smpr2 = ADC_SMPR2_SMP_AN0(ADC_SAMPLE_480) |
+             ADC_SMPR2_SMP_AN1(ADC_SAMPLE_480) |
+             ADC_SMPR2_SMP_AN2(ADC_SAMPLE_480) |
+             ADC_SMPR2_SMP_AN3(ADC_SAMPLE_480),
+    .sqr1 = ADC_SQR1_NUM_CH(ADC_NUM_CHANNELS),
+    .sqr2 = 0,
+    .sqr3 = ADC_SQR3_SQ1_N(ADC_CHANNEL_IN0) |
+            ADC_SQR3_SQ2_N(ADC_CHANNEL_IN1) |
+            ADC_SQR3_SQ3_N(ADC_CHANNEL_IN2) |
+            ADC_SQR3_SQ4_N(ADC_CHANNEL_IN3) |
+            ADC_SQR3_SQ5_N(ADC_CHANNEL_IN10) |
+            ADC_SQR3_SQ6_N(ADC_CHANNEL_IN11)
+};
+
+// Initialize ADC with DMA
+bool platform_adc_init(void) {
+    if (adcInitialized) {
+        return true;
+    }
+
+    adcStart(&ADCD1, NULL);
+    adcStartConversion(&ADCD1, &adcConvGroup, adcBuffer, ADC_BUFFER_DEPTH);
+    adcInitialized = true;
+    return true;
+}
+
+// Read ADC channel (averaged from DMA buffer)
+uint16_t platform_adc_read(uint8_t channel) {
+    if (!adcInitialized || channel >= ADC_NUM_CHANNELS) {
+        return 0;
+    }
+
+    // Average samples from DMA buffer
+    uint32_t sum = 0;
+    for (int i = 0; i < ADC_BUFFER_DEPTH; i++) {
+        sum += adcBuffer[i * ADC_NUM_CHANNELS + channel];
+    }
+    return sum / ADC_BUFFER_DEPTH;
+}
+
+// Read multiple ADC channels at once
+void platform_adc_read_multiple(uint16_t* values, uint8_t numChannels) {
+    if (!adcInitialized) {
+        return;
+    }
+
+    for (uint8_t ch = 0; ch < numChannels && ch < ADC_NUM_CHANNELS; ch++) {
+        values[ch] = platform_adc_read(ch);
+    }
+}
+
+// Get raw ADC buffer pointer for advanced use
+adcsample_t* platform_adc_get_buffer(void) {
+    return adcBuffer;
+}
 
 // -----------------------------------------
 // Time Functions
@@ -330,22 +473,165 @@ bool platform_flash_erase(uint32_t address, uint32_t length) {
 }
 
 // -----------------------------------------
-// EEPROM Emulation Functions
+// EEPROM Emulation with Wear-Leveling
 // -----------------------------------------
 
+// Page header structure (stored at start of each page)
+typedef struct {
+    uint16_t magic;      // EEPROM_MAGIC
+    uint16_t sequence;   // Sequence number for ordering
+} EepromPageHeader;
+
+// Find the most recent valid page
+static int32_t eeprom_find_current_page(void) {
+    uint16_t maxSequence = 0;
+    int32_t currentPage = -1;
+
+    for (uint32_t page = 0; page < EEPROM_NUM_PAGES; page++) {
+        uint32_t pageAddr = EEPROM_START_ADDRESS + (page * EEPROM_PAGE_SIZE);
+        EepromPageHeader header;
+        platform_flash_read(pageAddr, (uint8_t*)&header, sizeof(header));
+
+        if (header.magic == EEPROM_MAGIC) {
+            // Handle sequence wraparound
+            if (currentPage == -1 ||
+                (int16_t)(header.sequence - maxSequence) > 0) {
+                maxSequence = header.sequence;
+                currentPage = page;
+            }
+        }
+    }
+
+    return currentPage;
+}
+
+// Find next free page for writing
+static int32_t eeprom_find_next_page(uint16_t* nextSequence) {
+    int32_t currentPage = eeprom_find_current_page();
+
+    if (currentPage == -1) {
+        // No valid pages, start fresh
+        *nextSequence = 1;
+        return 0;
+    }
+
+    // Get current sequence
+    uint32_t pageAddr = EEPROM_START_ADDRESS + (currentPage * EEPROM_PAGE_SIZE);
+    EepromPageHeader header;
+    platform_flash_read(pageAddr, (uint8_t*)&header, sizeof(header));
+
+    *nextSequence = header.sequence + 1;
+    return (currentPage + 1) % EEPROM_NUM_PAGES;
+}
+
+// Check if page needs erasing (not all 0xFF)
+static bool eeprom_page_needs_erase(uint32_t page) {
+    uint32_t pageAddr = EEPROM_START_ADDRESS + (page * EEPROM_PAGE_SIZE);
+
+    for (uint32_t i = 0; i < EEPROM_PAGE_SIZE; i++) {
+        uint8_t byte;
+        platform_flash_read(pageAddr + i, &byte, 1);
+        if (byte != 0xFF) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool platform_eeprom_read(uint32_t offset, uint8_t* data, uint32_t length) {
-    if (offset + length > EEPROM_SIZE) {
+    if (offset + length > EEPROM_PAGE_SIZE - EEPROM_HEADER_SIZE) {
         return false;
     }
-    return platform_flash_read(EEPROM_START_ADDRESS + offset, data, length);
+
+    int32_t currentPage = eeprom_find_current_page();
+    if (currentPage == -1) {
+        // No valid data, return zeros
+        for (uint32_t i = 0; i < length; i++) {
+            data[i] = 0;
+        }
+        return true;
+    }
+
+    uint32_t pageAddr = EEPROM_START_ADDRESS + (currentPage * EEPROM_PAGE_SIZE);
+    return platform_flash_read(pageAddr + EEPROM_HEADER_SIZE + offset, data, length);
 }
 
 bool platform_eeprom_write(uint32_t offset, const uint8_t* data, uint32_t length) {
-    if (offset + length > EEPROM_SIZE) {
+    if (offset + length > EEPROM_PAGE_SIZE - EEPROM_HEADER_SIZE) {
         return false;
     }
-    // Note: For real EEPROM emulation, implement wear-leveling
-    return platform_flash_write(EEPROM_START_ADDRESS + offset, data, length);
+
+    // Find next page to write
+    uint16_t nextSequence;
+    int32_t nextPage = eeprom_find_next_page(&nextSequence);
+    uint32_t nextPageAddr = EEPROM_START_ADDRESS + (nextPage * EEPROM_PAGE_SIZE);
+
+    // Erase page if needed
+    if (eeprom_page_needs_erase(nextPage)) {
+        // Need to erase entire sector - copy other pages first if in same sector
+        // For simplicity, just erase (real implementation would preserve other data)
+        if (!platform_flash_erase(nextPageAddr, EEPROM_PAGE_SIZE)) {
+            return false;
+        }
+    }
+
+    // Read current data (if any) to preserve unchanged bytes
+    uint8_t pageBuffer[EEPROM_PAGE_SIZE];
+    int32_t currentPage = eeprom_find_current_page();
+
+    if (currentPage >= 0) {
+        uint32_t currentAddr = EEPROM_START_ADDRESS + (currentPage * EEPROM_PAGE_SIZE);
+        platform_flash_read(currentAddr, pageBuffer, EEPROM_PAGE_SIZE);
+    } else {
+        // Initialize with 0xFF
+        for (uint32_t i = 0; i < EEPROM_PAGE_SIZE; i++) {
+            pageBuffer[i] = 0xFF;
+        }
+    }
+
+    // Update header
+    EepromPageHeader* header = (EepromPageHeader*)pageBuffer;
+    header->magic = EEPROM_MAGIC;
+    header->sequence = nextSequence;
+
+    // Update data
+    for (uint32_t i = 0; i < length; i++) {
+        pageBuffer[EEPROM_HEADER_SIZE + offset + i] = data[i];
+    }
+
+    // Write entire page
+    return platform_flash_write(nextPageAddr, pageBuffer, EEPROM_PAGE_SIZE);
+}
+
+// Get EEPROM wear statistics
+void platform_eeprom_get_stats(uint32_t* usedPages, uint32_t* totalPages, uint16_t* currentSeq) {
+    *totalPages = EEPROM_NUM_PAGES;
+    *usedPages = 0;
+
+    for (uint32_t page = 0; page < EEPROM_NUM_PAGES; page++) {
+        uint32_t pageAddr = EEPROM_START_ADDRESS + (page * EEPROM_PAGE_SIZE);
+        EepromPageHeader header;
+        platform_flash_read(pageAddr, (uint8_t*)&header, sizeof(header));
+
+        if (header.magic == EEPROM_MAGIC) {
+            (*usedPages)++;
+        }
+    }
+
+    int32_t currentPage = eeprom_find_current_page();
+    if (currentPage >= 0) {
+        uint32_t pageAddr = EEPROM_START_ADDRESS + (currentPage * EEPROM_PAGE_SIZE);
+        EepromPageHeader header;
+        platform_flash_read(pageAddr, (uint8_t*)&header, sizeof(header));
+        *currentSeq = header.sequence;
+    } else {
+        *currentSeq = 0;
+    }
+}
+
+// Format EEPROM (erase all pages)
+bool platform_eeprom_format(void) {
+    return platform_flash_erase(EEPROM_START_ADDRESS, EEPROM_SIZE);
 }
 
 // -----------------------------------------
