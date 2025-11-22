@@ -1,0 +1,153 @@
+{
+  "project": "RX8_ECU",
+  "version": "1.0",
+  "compu_methods": [
+    {
+      "name": "CM_RPM",
+      "formula": "X*0.25",
+      "unit": "rpm",
+      "description": "RPM conversion (1/4 RPM per count)"
+    },
+    {
+      "name": "CM_TEMP_C",
+      "formula": "X-40",
+      "unit": "degC",
+      "description": "Temperature with -40 offset"
+    },
+    {
+      "name": "CM_PERCENT",
+      "formula": "X*0.5",
+      "unit": "%",
+      "description": "Percent in 0.5% increments"
+    },
+    {
+      "name": "CM_SPEED_KPH",
+      "formula": "(X-10000)*0.01",
+      "unit": "km/h",
+      "description": "RX8 speed encoding"
+    },
+    {
+      "name": "CM_VOLTAGE",
+      "formula": "X*0.01",
+      "unit": "V",
+      "description": "Voltage in 10mV increments"
+    }
+  ],
+  "measurements": [
+    {
+      "name": "engineRPM",
+      "address": "0x20001000",
+      "datatype": "UWORD",
+      "description": "Engine speed",
+      "unit": "rpm",
+      "lower_limit": 0,
+      "upper_limit": 10000,
+      "conversion": "CM_RPM"
+    },
+    {
+      "name": "coolantTemp",
+      "address": "0x20001002",
+      "datatype": "UBYTE",
+      "description": "Engine coolant temperature",
+      "unit": "degC",
+      "lower_limit": -40,
+      "upper_limit": 215,
+      "conversion": "CM_TEMP_C"
+    },
+    {
+      "name": "throttlePosition",
+      "address": "0x20001003",
+      "datatype": "UBYTE",
+      "description": "Throttle pedal position",
+      "unit": "%",
+      "lower_limit": 0,
+      "upper_limit": 100,
+      "conversion": "CM_PERCENT"
+    },
+    {
+      "name": "vehicleSpeed",
+      "address": "0x20001004",
+      "datatype": "UWORD",
+      "description": "Vehicle speed from wheel sensors",
+      "unit": "km/h",
+      "lower_limit": 0,
+      "upper_limit": 300,
+      "conversion": "CM_SPEED_KPH"
+    },
+    {
+      "name": "batteryVoltage",
+      "address": "0x20001006",
+      "datatype": "UWORD",
+      "description": "Battery voltage",
+      "unit": "V",
+      "lower_limit": 0,
+      "upper_limit": 20,
+      "conversion": "CM_VOLTAGE"
+    },
+    {
+      "name": "oilPressure",
+      "address": "0x20001008",
+      "datatype": "UWORD",
+      "description": "Engine oil pressure",
+      "unit": "kPa",
+      "lower_limit": 0,
+      "upper_limit": 1000
+    },
+    {
+      "name": "checkEngineMIL",
+      "address": "0x2000100A",
+      "datatype": "UBYTE",
+      "description": "Check engine light status",
+      "unit": "",
+      "lower_limit": 0,
+      "upper_limit": 1
+    },
+    {
+      "name": "odometerCount",
+      "address": "0x2000100B",
+      "datatype": "ULONG",
+      "description": "Odometer increment counter (4140/mile)",
+      "unit": "counts",
+      "lower_limit": 0,
+      "upper_limit": 4294967295
+    }
+  ],
+  "characteristics": [
+    {
+      "name": "rpmMultiplier",
+      "address": "0x20002000",
+      "datatype": "UWORD",
+      "description": "RPM encoding multiplier (default 385 = 3.85)",
+      "unit": "",
+      "lower_limit": 100,
+      "upper_limit": 1000
+    },
+    {
+      "name": "speedOffset",
+      "address": "0x20002002",
+      "datatype": "UWORD",
+      "description": "Speed encoding offset (default 10000)",
+      "unit": "",
+      "lower_limit": 0,
+      "upper_limit": 20000
+    },
+    {
+      "name": "wheelSpeedThreshold",
+      "address": "0x20002004",
+      "datatype": "UWORD",
+      "description": "Wheel speed mismatch threshold (default 500)",
+      "unit": "",
+      "lower_limit": 100,
+      "upper_limit": 2000
+    },
+    {
+      "name": "odometerDivisor",
+      "address": "0x20002006",
+      "datatype": "UWORD",
+      "description": "Odometer increments per mile (default 4140)",
+      "unit": "counts/mile",
+      "lower_limit": 1000,
+      "upper_limit": 10000
+    }
+  ]
+}
