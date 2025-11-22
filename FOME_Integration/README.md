@@ -10,6 +10,7 @@ This module adds capabilities that make FOME competitive with commercial ECUs:
 |---------|-------------|--------|
 | **Vehicle Profiles** | Body electronics for different vehicles | ✅ Complete |
 | **XCP Protocol** | Professional calibration tool support | ✅ Complete |
+| **XCP Flash Programming** | ECU reflashing via XCP | ✅ Complete |
 | **A2L Generator** | ASAM MCD-2MC description files | ✅ Complete |
 | **Simulink Integration** | Model-based development workflow | ✅ Documented |
 | **Platform Abstraction** | Desktop, Arduino, STM32 support | ✅ Complete |
@@ -76,6 +77,7 @@ FOME_Integration/
 └── tests/                       # Unit tests
     ├── test_xcp_protocol.cpp    # 11 tests
     ├── test_can_encoding.cpp    # 17 tests
+    ├── test_xcp_flash.cpp       # 21 tests
     ├── test_a2l_generator.py    # 20 tests
     └── Makefile
 ```
@@ -236,15 +238,17 @@ make test
 ```bash
 make run-xcp    # XCP protocol (11 tests)
 make run-can    # CAN encoding (17 tests)
+make run-flash  # XCP flash programming (21 tests)
 make run-a2l    # A2L generator (20 tests)
 ```
 
 ### Test Coverage
 
-- **48 total tests**
-- XCP: Connect, disconnect, upload, download, DAQ
-- CAN: RPM, speed, throttle, warnings encoding
-- A2L: File structure, variables, formulas
+- **69 total tests**
+- XCP Protocol: Connect, disconnect, upload, download, DAQ (11 tests)
+- XCP Flash: Program start, clear, write, verify, reset (21 tests)
+- CAN: RPM, speed, throttle, warnings encoding (17 tests)
+- A2L: File structure, variables, formulas (20 tests)
 
 ## Development Roadmap
 
@@ -253,15 +257,15 @@ make run-a2l    # A2L generator (20 tests)
 - [x] Vehicle profile system
 - [x] RX8 full implementation
 - [x] XCP slave protocol
+- [x] XCP flash programming
 - [x] A2L file generator
 - [x] Platform abstraction
-- [x] Test suite
+- [x] Test suite (69 tests)
 
 ### Future Work
 
 - [ ] Miata NC profile
 - [ ] BMW E46 profile
-- [ ] XCP flash programming
 - [ ] Simulink code generation target
 - [ ] CCP (legacy) support
 
