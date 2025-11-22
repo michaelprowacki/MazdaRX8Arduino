@@ -11,6 +11,7 @@ This module adds capabilities that make FOME competitive with commercial ECUs:
 | **Vehicle Profiles** | Body electronics for different vehicles | ✅ Complete |
 | **XCP Protocol** | Professional calibration tool support | ✅ Complete |
 | **XCP Flash Programming** | ECU reflashing via XCP | ✅ Complete |
+| **XCP Security** | Seed/key authentication | ✅ Complete |
 | **A2L Generator** | ASAM MCD-2MC description files | ✅ Complete |
 | **Simulink Integration** | Model-based development workflow | ✅ Documented |
 | **Platform Abstraction** | Desktop, Arduino, STM32 support | ✅ Complete |
@@ -78,6 +79,8 @@ FOME_Integration/
     ├── test_xcp_protocol.cpp    # 11 tests
     ├── test_can_encoding.cpp    # 17 tests
     ├── test_xcp_flash.cpp       # 21 tests
+    ├── test_xcp_security.cpp    # 14 tests
+    ├── test_integration.cpp     # 10 tests
     ├── test_a2l_generator.py    # 20 tests
     └── Makefile
 ```
@@ -236,18 +239,22 @@ make test
 ### Individual Suites
 
 ```bash
-make run-xcp    # XCP protocol (11 tests)
-make run-can    # CAN encoding (17 tests)
-make run-flash  # XCP flash programming (21 tests)
-make run-a2l    # A2L generator (20 tests)
+make run-xcp        # XCP protocol (11 tests)
+make run-can        # CAN encoding (17 tests)
+make run-flash      # XCP flash programming (21 tests)
+make run-security   # XCP security (14 tests)
+make run-integration # Integration tests (10 tests)
+make run-a2l        # A2L generator (20 tests)
 ```
 
 ### Test Coverage
 
-- **69 total tests**
+- **93 total tests**
 - XCP Protocol: Connect, disconnect, upload, download, DAQ (11 tests)
 - XCP Flash: Program start, clear, write, verify, reset (21 tests)
+- XCP Security: Seed/key unlock, multiple resources (14 tests)
 - CAN: RPM, speed, throttle, warnings encoding (17 tests)
+- Integration: XCP + vehicle profiles end-to-end (10 tests)
 - A2L: File structure, variables, formulas (20 tests)
 
 ## Development Roadmap
@@ -258,9 +265,12 @@ make run-a2l    # A2L generator (20 tests)
 - [x] RX8 full implementation
 - [x] XCP slave protocol
 - [x] XCP flash programming
+- [x] XCP seed/key security
 - [x] A2L file generator
-- [x] Platform abstraction
-- [x] Test suite (69 tests)
+- [x] Platform abstraction (Desktop, Arduino, STM32)
+- [x] Simulink code generation target
+- [x] Integration tests
+- [x] Test suite (93 tests)
 
 ### Future Work
 

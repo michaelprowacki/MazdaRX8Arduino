@@ -1,9 +1,16 @@
 /*
- * STM32 Platform Implementation (Stub)
+ * STM32 Platform Implementation
  *
  * For STM32F4/F7/H7 with ChibiOS RTOS
  *
  * Requires: ChibiOS HAL, STM32 HAL
+ *
+ * Supports:
+ * - CAN bus with hardware filters
+ * - Flash programming with sector management
+ * - EEPROM emulation in flash
+ * - Hardware watchdog (IWDG)
+ * - ADC with DMA
  */
 
 #include "platform_abstraction.h"
@@ -13,6 +20,24 @@
 // Include ChibiOS headers
 #include "ch.h"
 #include "hal.h"
+#include "stm32_registry.h"
+
+// Flash sector definitions for STM32F4
+#define FLASH_SECTOR_0_ADDR   0x08000000
+#define FLASH_SECTOR_1_ADDR   0x08004000
+#define FLASH_SECTOR_2_ADDR   0x08008000
+#define FLASH_SECTOR_3_ADDR   0x0800C000
+#define FLASH_SECTOR_4_ADDR   0x08010000
+#define FLASH_SECTOR_5_ADDR   0x08020000
+#define FLASH_SECTOR_6_ADDR   0x08040000
+#define FLASH_SECTOR_7_ADDR   0x08060000
+
+// EEPROM emulation in last flash sector
+#define EEPROM_START_ADDRESS  FLASH_SECTOR_7_ADDR
+#define EEPROM_SIZE           0x20000  // 128KB
+
+// CAN filter configuration
+#define CAN_FILTER_BANKS      14
 
 // -----------------------------------------
 // Time Functions
@@ -188,6 +213,44 @@ int platform_serial_available(void) {
 // Flash Functions
 // -----------------------------------------
 
+// Get flash sector number from address
+static int get_flash_sector(uint32_t address) {
+    if (address < FLASH_SECTOR_1_ADDR) return 0;
+    if (address < FLASH_SECTOR_2_ADDR) return 1;
+    if (address < FLASH_SECTOR_3_ADDR) return 2;
+    if (address < FLASH_SECTOR_4_ADDR) return 3;
+    if (address < FLASH_SECTOR_5_ADDR) return 4;
+    if (address < FLASH_SECTOR_6_ADDR) return 5;
+    if (address < FLASH_SECTOR_7_ADDR) return 6;
+    return 7;
+}
+
+// Unlock flash for programming
+static bool flash_unlock(void) {
+    if (FLASH->CR & FLASH_CR_LOCK) {
+        FLASH->KEYR = 0x45670123;
+        FLASH->KEYR = 0xCDEF89AB;
+    }
+    return !(FLASH->CR & FLASH_CR_LOCK);
+}
+
+// Lock flash after programming
+static void flash_lock(void) {
+    FLASH->CR |= FLASH_CR_LOCK;
+}
+
+// Wait for flash operation to complete
+static bool flash_wait_complete(uint32_t timeout_ms) {
+    systime_t start = chVTGetSystemTime();
+    while (FLASH->SR & FLASH_SR_BSY) {
+        if (TIME_I2MS(chVTTimeElapsedSinceX(start)) > timeout_ms) {
+            return false;
+        }
+        chThdYield();
+    }
+    return true;
+}
+
 bool platform_flash_read(uint32_t address, uint8_t* data, uint32_t length) {
     // Direct memory read from flash
     for (uint32_t i = 0; i < length; i++) {
@@ -197,18 +260,92 @@ bool platform_flash_read(uint32_t address, uint8_t* data, uint32_t length) {
 }
 
 bool platform_flash_write(uint32_t address, const uint8_t* data, uint32_t length) {
-    // Use STM32 HAL flash programming
-    // This is a stub - requires proper flash unlock/program sequence
-    (void)address;
-    (void)data;
-    (void)length;
-    return false;
+    if (!flash_unlock()) {
+        return false;
+    }
+
+    // Clear error flags
+    FLASH->SR = FLASH_SR_PGSERR | FLASH_SR_PGPERR | FLASH_SR_PGAERR |
+                FLASH_SR_WRPERR | FLASH_SR_OPERR | FLASH_SR_EOP;
+
+    // Set programming mode (byte)
+    FLASH->CR &= ~FLASH_CR_PSIZE;
+    FLASH->CR |= FLASH_CR_PG;
+
+    bool success = true;
+    for (uint32_t i = 0; i < length; i++) {
+        *(volatile uint8_t*)(address + i) = data[i];
+
+        if (!flash_wait_complete(100)) {
+            success = false;
+            break;
+        }
+
+        if (FLASH->SR & (FLASH_SR_PGSERR | FLASH_SR_PGPERR | FLASH_SR_WRPERR)) {
+            success = false;
+            break;
+        }
+    }
+
+    FLASH->CR &= ~FLASH_CR_PG;
+    flash_lock();
+
+    return success;
 }
 
 bool platform_flash_erase(uint32_t address, uint32_t length) {
-    (void)address;
-    (void)length;
-    return false;
+    if (!flash_unlock()) {
+        return false;
+    }
+
+    // Clear error flags
+    FLASH->SR = FLASH_SR_PGSERR | FLASH_SR_PGPERR | FLASH_SR_PGAERR |
+                FLASH_SR_WRPERR | FLASH_SR_OPERR | FLASH_SR_EOP;
+
+    int start_sector = get_flash_sector(address);
+    int end_sector = get_flash_sector(address + length - 1);
+
+    bool success = true;
+    for (int sector = start_sector; sector <= end_sector; sector++) {
+        // Configure sector erase
+        FLASH->CR &= ~FLASH_CR_SNB;
+        FLASH->CR |= (sector << 3) | FLASH_CR_SER;
+        FLASH->CR |= FLASH_CR_STRT;
+
+        if (!flash_wait_complete(2000)) {  // Sector erase can take up to 2s
+            success = false;
+            break;
+        }
+
+        if (FLASH->SR & (FLASH_SR_PGSERR | FLASH_SR_WRPERR)) {
+            success = false;
+            break;
+        }
+    }
+
+    FLASH->CR &= ~FLASH_CR_SER;
+    flash_lock();
+
+    return success;
+}
+
+// -----------------------------------------
+// EEPROM Emulation Functions
+// -----------------------------------------
+
+bool platform_eeprom_read(uint32_t offset, uint8_t* data, uint32_t length) {
+    if (offset + length > EEPROM_SIZE) {
+        return false;
+    }
+    return platform_flash_read(EEPROM_START_ADDRESS + offset, data, length);
+}
+
+bool platform_eeprom_write(uint32_t offset, const uint8_t* data, uint32_t length) {
+    if (offset + length > EEPROM_SIZE) {
+        return false;
+    }
+    // Note: For real EEPROM emulation, implement wear-leveling
+    return platform_flash_write(EEPROM_START_ADDRESS + offset, data, length);
 }
 
 // -----------------------------------------

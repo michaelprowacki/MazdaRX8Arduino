@@ -5,7 +5,7 @@ CXXFLAGS = -Wall -Wextra -std=c++11 -I..
 PYTHON = python3
 
 # Test executables
-TESTS = test_xcp_protocol test_can_encoding test_xcp_flash
+TESTS = test_xcp_protocol test_can_encoding test_xcp_flash test_xcp_security test_integration
 
 .PHONY: all clean test test-cpp test-python
 
@@ -40,6 +40,12 @@ test_can_encoding: test_can_encoding.cpp
 test_xcp_flash: test_xcp_flash.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
+test_xcp_security: test_xcp_security.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+test_integration: test_integration.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
 # Note: test_vehicle_profile requires the full vehicle_profile implementation
 # which includes platform-specific code. It's designed for embedded testing.
 
@@ -58,6 +64,12 @@ run-a2l:
 
 run-flash: test_xcp_flash
 	./test_xcp_flash
+
+run-security: test_xcp_security
+	./test_xcp_security
+
+run-integration: test_integration
+	./test_integration
 
 # Quick test (just CAN encoding)
 quick: test_can_encoding
