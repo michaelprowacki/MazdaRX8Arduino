@@ -39,6 +39,27 @@ extern "C" {
     uint32_t xcpGetTimestamp() {
         return mock_timestamp++;
     }
+
+    // Flash function stubs (not used in basic protocol tests)
+    bool xcpFlashErase(uint32_t address, uint32_t length) {
+        (void)address;
+        (void)length;
+        return true;
+    }
+
+    bool xcpFlashWrite(uint32_t address, uint8_t* data, uint32_t length) {
+        (void)address;
+        (void)data;
+        (void)length;
+        return true;
+    }
+
+    bool xcpFlashVerify(uint32_t address, uint8_t* data, uint32_t length) {
+        (void)address;
+        (void)data;
+        (void)length;
+        return true;
+    }
 }
 
 #include "../xcp/xcp_protocol.h"

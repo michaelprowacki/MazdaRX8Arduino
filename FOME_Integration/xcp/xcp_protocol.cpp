@@ -122,6 +122,41 @@ void XcpSlave::processCommand(uint8_t* data, uint8_t length) {
             cmdGetDaqClock();
             break;
 
+        // Flash programming commands
+        case XCP_CMD_PROGRAM_START:
+            cmdProgramStart(data);
+            break;
+        case XCP_CMD_PROGRAM_CLEAR:
+            cmdProgramClear(data);
+            break;
+        case XCP_CMD_PROGRAM:
+            cmdProgram(data);
+            break;
+        case XCP_CMD_PROGRAM_RESET:
+            cmdProgramReset();
+            break;
+        case XCP_CMD_GET_PGM_PROCESSOR_INFO:
+            cmdGetPgmProcessorInfo();
+            break;
+        case XCP_CMD_GET_SECTOR_INFO:
+            cmdGetSectorInfo(data);
+            break;
+        case XCP_CMD_PROGRAM_PREPARE:
+            cmdProgramPrepare(data);
+            break;
+        case XCP_CMD_PROGRAM_FORMAT:
+            cmdProgramFormat(data);
+            break;
+        case XCP_CMD_PROGRAM_NEXT:
+            cmdProgramNext(data);
+            break;
+        case XCP_CMD_PROGRAM_MAX:
+            cmdProgramMax(data);
+            break;
+        case XCP_CMD_PROGRAM_VERIFY:
+            cmdProgramVerify(data);
+            break;
+
         default:
             sendError(XCP_ERR_CMD_UNKNOWN);
             break;
@@ -131,10 +166,11 @@ void XcpSlave::processCommand(uint8_t* data, uint8_t length) {
 void XcpSlave::cmdConnect(uint8_t* data) {
     // data[1] = mode (0 = normal, 1 = user defined)
     m_connected = true;
+    m_pgmState = XCP_PGM_IDLE;
 
     uint8_t response[8];
     response[0] = XCP_PID_RES;
-    response[1] = XCP_RESOURCE_CAL_PAG | XCP_RESOURCE_DAQ;  // Available resources
+    response[1] = XCP_RESOURCE_CAL_PAG | XCP_RESOURCE_DAQ | XCP_RESOURCE_PGM;  // Available resources
     response[2] = 0x00;  // COMM_MODE_BASIC
     response[3] = XCP_MAX_CTO;
     response[4] = (XCP_MAX_DTO >> 8) & 0xFF;
@@ -606,4 +642,248 @@ void XcpSlave::sendPositiveResponse() {
 
 void XcpSlave::canTransmit(uint8_t* data, uint8_t length) {
     xcpCanTransmit(m_txCanId, data, length);
+}
+
+// Flash Programming Command Implementations
+
+// Platform-specific flash functions (implement in platform layer)
+extern bool xcpFlashErase(uint32_t address, uint32_t length);
+extern bool xcpFlashWrite(uint32_t address, uint8_t* data, uint32_t length);
+extern bool xcpFlashVerify(uint32_t address, uint8_t* data, uint32_t length);
+
+void XcpSlave::cmdProgramStart(uint8_t* data) {
+    (void)data;
+
+    // Check if already in programming mode
+    if (m_pgmState != XCP_PGM_IDLE) {
+        sendError(XCP_ERR_PGM_ACTIVE);
+        return;
+    }
+
+    m_pgmState = XCP_PGM_STARTED;
+
+    // Initialize default sectors (platform should configure these)
+    m_pgmSectorCount = 2;
+    m_sectors[0] = {0x08000000, 0x4000, 0, 0, 0, 0};   // 16KB sector
+    m_sectors[1] = {0x08004000, 0x4000, 1, 1, 1, 0};   // 16KB sector
+
+    uint8_t response[8];
+    response[0] = XCP_PID_RES;
+    response[1] = 0x00;  // Reserved
+    response[2] = 0x01;  // COMM_MODE_PGM (block mode supported)
+    response[3] = XCP_PGM_MAX_SIZE;  // MAX_BS_PGM
+    response[4] = 0x00;  // MIN_ST_PGM
+    response[5] = 0x01;  // QUEUE_SIZE_PGM
+    response[6] = 0x00;  // Reserved
+    response[7] = 0x00;  // Reserved
+
+    sendResponse(response, 8);
+}
+
+void XcpSlave::cmdProgramClear(uint8_t* data) {
+    if (m_pgmState != XCP_PGM_STARTED) {
+        sendError(XCP_ERR_SEQUENCE);
+        return;
+    }
+
+    // data[1] = mode (0 = absolute, 1 = functional)
+    // data[4-7] = clear range (address already set via SET_MTA)
+    uint32_t clearRange = ((uint32_t)data[4] << 24) |
+                          ((uint32_t)data[5] << 16) |
+                          ((uint32_t)data[6] << 8) |
+                          (uint32_t)data[7];
+
+    // Perform flash erase
+    if (!xcpFlashErase(m_mta, clearRange)) {
+        sendError(XCP_ERR_GENERIC);
+        return;
+    }
+
+    m_pgmState = XCP_PGM_CLEARED;
+    sendPositiveResponse();
+}
+
+void XcpSlave::cmdProgram(uint8_t* data) {
+    if (m_pgmState != XCP_PGM_CLEARED && m_pgmState != XCP_PGM_PROGRAMMING) {
+        sendError(XCP_ERR_SEQUENCE);
+        return;
+    }
+
+    uint8_t numBytes = data[1];
+
+    if (numBytes > XCP_PGM_MAX_SIZE) {
+        sendError(XCP_ERR_OUT_OF_RANGE);
+        return;
+    }
+
+    // Special case: numBytes=0 means end of programming
+    if (numBytes == 0) {
+        m_pgmState = XCP_PGM_STARTED;
+        sendPositiveResponse();
+        return;
+    }
+
+    // Write data to flash
+    if (!xcpFlashWrite(m_mta, &data[2], numBytes)) {
+        sendError(XCP_ERR_GENERIC);
+        return;
+    }
+
+    m_mta += numBytes;
+    m_pgmState = XCP_PGM_PROGRAMMING;
+    sendPositiveResponse();
+}
+
+void XcpSlave::cmdProgramReset() {
+    // Reset programming state and optionally reset ECU
+    m_pgmState = XCP_PGM_IDLE;
+    m_connected = false;
+
+    sendPositiveResponse();
+
+    // Platform should reset the device after sending response
+    // extern void xcpReset();
+    // xcpReset();
+}
+
+void XcpSlave::cmdGetPgmProcessorInfo() {
+    uint8_t response[8];
+    response[0] = XCP_PID_RES;
+    response[1] = 0x07;  // PGM_PROPERTIES (absolute + functional + sector info)
+    response[2] = m_pgmSectorCount;  // MAX_SECTOR
+    response[3] = 0x00;  // Reserved
+    response[4] = 0x00;  // Reserved
+    response[5] = 0x00;  // Reserved
+    response[6] = 0x00;  // Reserved
+    response[7] = 0x00;  // Reserved
+
+    sendResponse(response, 8);
+}
+
+void XcpSlave::cmdGetSectorInfo(uint8_t* data) {
+    uint8_t mode = data[1];
+    uint8_t sectorNum = data[2];
+
+    if (sectorNum >= m_pgmSectorCount) {
+        sendError(XCP_ERR_OUT_OF_RANGE);
+        return;
+    }
+
+    XcpSectorInfo* sector = &m_sectors[sectorNum];
+
+    if (mode == 0) {
+        // Return start address and length
+        uint8_t response[8];
+        response[0] = XCP_PID_RES;
+        response[1] = sector->clearSequenceNumber;
+        response[2] = sector->programSequenceNumber;
+        response[3] = sector->programMethod;
+        response[4] = (sector->length >> 24) & 0xFF;
+        response[5] = (sector->length >> 16) & 0xFF;
+        response[6] = (sector->length >> 8) & 0xFF;
+        response[7] = sector->length & 0xFF;
+        sendResponse(response, 8);
+    } else if (mode == 1) {
+        // Return start address
+        uint8_t response[8];
+        response[0] = XCP_PID_RES;
+        response[1] = 0x00;  // Reserved
+        response[2] = 0x00;  // Reserved
+        response[3] = 0x00;  // Reserved
+        response[4] = (sector->startAddress >> 24) & 0xFF;
+        response[5] = (sector->startAddress >> 16) & 0xFF;
+        response[6] = (sector->startAddress >> 8) & 0xFF;
+        response[7] = sector->startAddress & 0xFF;
+        sendResponse(response, 8);
+    } else {
+        sendError(XCP_ERR_MODE_NOT_VALID);
+    }
+}
+
+void XcpSlave::cmdProgramPrepare(uint8_t* data) {
+    // Prepare for programming (unlock, etc.)
+    uint16_t codeSize = ((uint16_t)data[2] << 8) | data[3];
+
+    (void)codeSize;  // Could be used for buffer allocation
+
+    // Nothing to do in this implementation
+    sendPositiveResponse();
+}
+
+void XcpSlave::cmdProgramFormat(uint8_t* data) {
+    // Set compression, encryption settings
+    uint8_t compressionMethod = data[1];
+    uint8_t encryptionMethod = data[2];
+    uint8_t programmingMethod = data[3];
+    uint8_t accessMethod = data[4];
+
+    // This implementation doesn't support compression or encryption
+    if (compressionMethod != 0 || encryptionMethod != 0) {
+        sendError(XCP_ERR_MODE_NOT_VALID);
+        return;
+    }
+
+    (void)programmingMethod;
+    (void)accessMethod;
+
+    sendPositiveResponse();
+}
+
+void XcpSlave::cmdProgramNext(uint8_t* data) {
+    // Continue programming with next block (for block mode)
+    // Same as PROGRAM but for subsequent blocks
+    cmdProgram(data);
+}
+
+void XcpSlave::cmdProgramMax(uint8_t* data) {
+    // Program maximum bytes (fills rest of packet)
+    // data[1-7] = up to 6 bytes of program data
+    uint8_t numBytes = XCP_PGM_MAX_SIZE;
+
+    if (m_pgmState != XCP_PGM_CLEARED && m_pgmState != XCP_PGM_PROGRAMMING) {
+        sendError(XCP_ERR_SEQUENCE);
+        return;
+    }
+
+    if (!xcpFlashWrite(m_mta, &data[1], numBytes)) {
+        sendError(XCP_ERR_GENERIC);
+        return;
+    }
+
+    m_mta += numBytes;
+    m_pgmState = XCP_PGM_PROGRAMMING;
+    sendPositiveResponse();
+}
+
+void XcpSlave::cmdProgramVerify(uint8_t* data) {
+    // Verify programmed data
+    uint8_t mode = data[1];
+    uint16_t type = ((uint16_t)data[2] << 8) | data[3];
+    uint32_t value = ((uint32_t)data[4] << 24) |
+                     ((uint32_t)data[5] << 16) |
+                     ((uint32_t)data[6] << 8) |
+                     (uint32_t)data[7];
+
+    (void)type;
+
+    if (mode == 0) {
+        // Request internal verification
+        // Platform should verify flash contents
+        sendPositiveResponse();
+    } else if (mode == 1) {
+        // Verification with value
+        // Compare MTA contents with provided value
+        uint32_t actualValue = 0;
+        for (int i = 0; i < 4; i++) {
+            actualValue = (actualValue << 8) | xcpReadByte(m_mta + i);
+        }
+
+        if (actualValue != value) {
+            sendError(XCP_ERR_VERIFY);
+            return;
+        }
+        sendPositiveResponse();
+    } else {
+        sendError(XCP_ERR_MODE_NOT_VALID);
+    }
 }

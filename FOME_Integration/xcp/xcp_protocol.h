@@ -52,6 +52,19 @@
 #define XCP_CMD_ALLOC_ODT           0xD4
 #define XCP_CMD_ALLOC_ODT_ENTRY     0xD3
 
+// Flash Programming Commands
+#define XCP_CMD_PROGRAM_START       0xD2
+#define XCP_CMD_PROGRAM_CLEAR       0xD1
+#define XCP_CMD_PROGRAM             0xD0
+#define XCP_CMD_PROGRAM_RESET       0xCF
+#define XCP_CMD_GET_PGM_PROCESSOR_INFO 0xCE
+#define XCP_CMD_GET_SECTOR_INFO     0xCD
+#define XCP_CMD_PROGRAM_PREPARE     0xCC
+#define XCP_CMD_PROGRAM_FORMAT      0xCB
+#define XCP_CMD_PROGRAM_NEXT        0xCA
+#define XCP_CMD_PROGRAM_MAX         0xC9
+#define XCP_CMD_PROGRAM_VERIFY      0xC8
+
 // Response Codes
 #define XCP_PID_RES                 0xFF  // Positive response
 #define XCP_PID_ERR                 0xFE  // Error
@@ -90,6 +103,28 @@
 #define XCP_MAX_DAQ_LISTS           4     // Number of DAQ lists
 #define XCP_MAX_ODT_PER_LIST        8     // ODTs per DAQ list
 #define XCP_MAX_ENTRIES_PER_ODT     7     // Entries per ODT
+
+// Flash Programming Configuration
+#define XCP_MAX_SECTORS             8     // Max flash sectors
+#define XCP_PGM_MAX_SIZE            6     // Max bytes per PROGRAM command
+
+// Flash sector information
+struct XcpSectorInfo {
+    uint32_t startAddress;
+    uint32_t length;
+    uint8_t  number;
+    uint8_t  clearSequenceNumber;
+    uint8_t  programSequenceNumber;
+    uint8_t  programMethod;
+};
+
+// Programming state
+enum XcpPgmState {
+    XCP_PGM_IDLE = 0,
+    XCP_PGM_STARTED,
+    XCP_PGM_CLEARED,
+    XCP_PGM_PROGRAMMING
+};
 
 // DAQ structures
 struct XcpOdtEntry {
@@ -172,6 +207,24 @@ private:
     void cmdGetDaqListInfo(uint8_t* data);
     void cmdGetDaqEventInfo(uint8_t* data);
     void cmdGetDaqClock();
+
+    // Flash programming command handlers
+    void cmdProgramStart(uint8_t* data);
+    void cmdProgramClear(uint8_t* data);
+    void cmdProgram(uint8_t* data);
+    void cmdProgramReset();
+    void cmdGetPgmProcessorInfo();
+    void cmdGetSectorInfo(uint8_t* data);
+    void cmdProgramPrepare(uint8_t* data);
+    void cmdProgramFormat(uint8_t* data);
+    void cmdProgramNext(uint8_t* data);
+    void cmdProgramMax(uint8_t* data);
+    void cmdProgramVerify(uint8_t* data);
+
+    // Flash programming state
+    XcpPgmState m_pgmState = XCP_PGM_IDLE;
+    uint8_t m_pgmSectorCount = 0;
+    XcpSectorInfo m_sectors[XCP_MAX_SECTORS];
 
     // Response helpers
     void sendResponse(uint8_t* data, uint8_t length);
